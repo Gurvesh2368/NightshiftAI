@@ -207,7 +207,7 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-publishable-key
 VITE_MAP_API_KEY=your-map-api-key
 VITE_EMERGENCY_EMAIL=patilgurveshp@gmail.com
-VITE_FAMILY_EMAILS=patilgurveshp@gmail.com
+VITE_FAMILY_EMAILS=shyammar12345@gmail.com
 VITE_USER_NAME="Gurvesh Patil"
 ```
 

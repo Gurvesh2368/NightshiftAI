@@ -97,6 +97,7 @@ function emergencyEmailPlugin(): Plugin {
               const payload = JSON.parse(body || '{}');
               // Requirement 1: Dynamically sends to affected user's email address from database, NOT admin/dev email
               const recipient = payload.recipientEmail || payload.affectedUserEmail || 'patilgurveshp@gmail.com';
+              const familyEmail = payload.familyEmail || process.env.VITE_FAMILY_EMAILS || 'shyammar12345@gmail.com';
               // Requirement 2: Subject line must be exactly '🚨EMERGENCY'
               const subject = payload.subject || '🚨EMERGENCY';
               const trackingUrl = payload.trackingUrl || 'http://localhost:5173/?view=contact_alert';
@@ -105,6 +106,7 @@ function emergencyEmailPlugin(): Plugin {
               console.log('====================================================');
               console.log('>>> [EMERGENCY DISASTER ALERT DISPATCH EXECUTING]');
               console.log('Affected User Recipient (To:):', recipient);
+              console.log('Primary Family Member (CC/Alert):', familyEmail);
               console.log('Worker:', payload.workerName || 'Gurvesh Patil');
               console.log('Hazard Type:', hazardType);
               console.log('Location:', payload.locationName || 'Live Telemetry Sector');
@@ -122,6 +124,7 @@ function emergencyEmailPlugin(): Plugin {
                   const info = await transporter.sendMail({
                     from: '"🚨 Emergency Disaster Alert — NightShift AI" <alerts@nightshift.ai>',
                     to: recipient,
+                    cc: familyEmail,
                     subject: subject,
                     text: payload.body || subject,
                     priority: 'high',

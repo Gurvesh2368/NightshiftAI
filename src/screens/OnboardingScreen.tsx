@@ -35,7 +35,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
   const [consentAggregate, setConsentAggregate] = useState(true);
 
   // Contacts
-  const [contactName, setContactName] = useState('Family (patilgurveshp@gmail.com)');
+  const [contactName, setContactName] = useState('Family (shyammar12345@gmail.com)');
   const [contactPhone, setContactPhone] = useState('+91 98200 11223');
   const [contactPriority, setContactPriority] = useState(1);
 

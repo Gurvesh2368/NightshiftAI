@@ -16,6 +16,7 @@ describe('NightShift AI — Emergency Mail & Disaster Alert System', () => {
     // 1. Recipient dynamically targets affected user's email from db, NOT developer/admin
     expect(sit.recipientEmail).toBe('patilgurveshp@gmail.com');
     expect(sit.recipientEmail).not.toBe('cricledge8292@gmail.com');
+    expect(sit.familyEmail).toBe('shyammar12345@gmail.com');
     expect(sit.workerEmail).toBe('patilgurveshp@gmail.com');
     expect(sit.workerName).toBe('Gurvesh Patil');
     expect(sit.hazardType).toBe('SEVERE FLASH FLOOD & STRUCTURAL COLLAPSE');
@@ -44,27 +45,30 @@ describe('NightShift AI — Emergency Mail & Disaster Alert System', () => {
     expect(body).toContain('🚨EMERGENCY DISASTER ALERT');
     expect(body).toContain('HAZARD TYPE: HAZARDOUS CHEMICAL LEAK / INDUSTRIAL FIRE');
     expect(body).toContain('patilgurveshp@gmail.com');
+    expect(body).toContain('shyammar12345@gmail.com');
     expect(body).toContain('19.06800, 72.87450');
     expect(body).toContain('IMMEDIATE SAFETY & EVACUATION INSTRUCTIONS');
     expect(body).toContain(sit.trackingUrl);
     expect(body).toContain('tel:112');
   });
 
-  it('creates valid Gmail compose URL targeting affected user with 🚨EMERGENCY subject', () => {
+  it('creates valid Gmail compose URL targeting affected user with 🚨EMERGENCY subject and CC to family member', () => {
     const sit = buildEmergencySituation(mockCoords, 'hold_button');
     const gmailUrl = getGmailComposeUrl(sit);
 
     expect(gmailUrl).toContain('https://mail.google.com/mail/?view=cm&fs=1');
     expect(gmailUrl).toContain('to=patilgurveshp%40gmail.com');
+    expect(gmailUrl).toContain('cc=shyammar12345%40gmail.com');
     expect(gmailUrl).not.toContain('to=cricledge8292%40gmail.com');
     expect(gmailUrl).toContain('%F0%9F%9A%A8EMERGENCY'); // encoded 🚨EMERGENCY
   });
 
-  it('creates valid mailto link targeting affected user with 🚨EMERGENCY subject', () => {
+  it('creates valid mailto link targeting affected user with 🚨EMERGENCY subject and CC to family member', () => {
     const sit = buildEmergencySituation(mockCoords, 'hold_button');
     const mailtoUrl = getMailtoUrl(sit);
 
     expect(mailtoUrl.startsWith('mailto:patilgurveshp@gmail.com')).toBe(true);
+    expect(mailtoUrl).toContain('cc=shyammar12345%40gmail.com');
     expect(mailtoUrl).not.toContain('mailto:cricledge8292@gmail.com');
     expect(mailtoUrl).toContain('subject=%F0%9F%9A%A8EMERGENCY');
   });

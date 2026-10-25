@@ -152,8 +152,8 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
 
   const actions = [
     {
-      title: `Emergency Report Auto-Sent to ${situation.recipientEmail}`,
-      detail: 'Transmitted with live GPS stream, medical record & 112 escalation',
+      title: `Emergency Report Auto-Sent to ${situation.familyEmail || 'shyammar12345@gmail.com'}`,
+      detail: `Transmitted with live GPS stream, medical record & alert to ${situation.recipientEmail}`,
       status: emailSentSuccess ? 'Sent (In-Place)' : isSendingEmail ? 'Dispatching...' : 'Ready',
       time: 'Instant',
       done: emailSentSuccess
@@ -244,7 +244,11 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
         <div className="p-3.5 rounded-xl bg-[#0F1210] border border-[#2C342A] space-y-2 text-[11px] font-mono">
           <div className="flex justify-between items-center">
             <span className="text-[#9BA398]">Primary Family Email:</span>
-            <strong className="text-[#C8DC35]">{situation.recipientEmail}</strong>
+            <strong className="text-[#C8DC35]">{situation.familyEmail || 'shyammar12345@gmail.com'}</strong>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[#9BA398]">Affected User Email:</span>
+            <span className="text-zinc-200">{situation.recipientEmail}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-[#9BA398]">Emergency SMS Mobile:</span>
