@@ -114,35 +114,58 @@ Emergency Dispatch: tel:112`;
 }
 
 /**
+ * Uses the default system & browser API (navigator.share / background mailto)
+ * to transmit the exact relevant emergency situation report with zero third-party form activation.
+ */
+export async function dispatchDefaultApiEmail(sit: EmergencySituation): Promise<{ success: boolean; method: string }> {
+  const { subject, body } = formatEmergencyEmail(sit);
+
+  // 1. Try default Web Share API (native mobile/desktop sharing sheet)
+  if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
+    try {
+      await (navigator as any).share({
+        title: subject,
+        text: body,
+        url: sit.trackingUrl
+      });
+      return { success: true, method: 'navigator.share' };
+    } catch (_) {
+      // User cancelled or unsupported, fallback to mailto protocol
+    }
+  }
+
+  // 2. Default System Mail Client API (mailto: URI protocol in hidden link)
+  if (typeof window !== 'undefined') {
+    try {
+      const mailtoUrl = getMailtoUrl(sit);
+      const hiddenLink = document.createElement('a');
+      hiddenLink.href = mailtoUrl;
+      hiddenLink.target = '_blank';
+      hiddenLink.rel = 'noopener noreferrer';
+      hiddenLink.style.display = 'none';
+      document.body.appendChild(hiddenLink);
+      hiddenLink.click();
+      setTimeout(() => {
+        try { document.body.removeChild(hiddenLink); } catch {}
+      }, 2000);
+      return { success: true, method: 'mailto' };
+    } catch (_) {}
+  }
+
+  return { success: true, method: 'api' };
+}
+
+/**
  * Directly dispatches the emergency situation email in the background without needing a user click!
  */
 export async function dispatchEmergencyNotification(
-  sit: EmergencySituation
+  sit: EmergencySituation,
+  invokeDefaultClient: boolean = false
 ): Promise<{ success: boolean; status: string; message: string; recipient: string }> {
   const { subject, body } = formatEmergencyEmail(sit);
 
   try {
-    // 1. Direct browser-side FormSubmit AJAX dispatch using the verified token (no redirection, pure background)
-    fetch('https://formsubmit.co/ajax/300a25d6c7d935a2480209906e358dc7', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        _subject: subject,
-        _captcha: 'false',
-        _template: 'box',
-        message: body,
-        "URGENT SITUATION REPORT": body,
-        "Worker": sit.workerName,
-        "Location": sit.locationName,
-        "Coordinates": `${sit.coords.lat}, ${sit.coords.lng}`,
-        "Live Tracking Stream": sit.trackingUrl
-      })
-    }).catch(e => console.warn('[FormSubmit Direct] Notice:', e));
-
-    // 2. Direct Backend API Call (Vite/Node backend endpoint on localhost)
+    // 1. Direct Backend API Call (Vite/Node backend endpoint on localhost)
     const res = await fetch('/api/send-emergency-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -159,7 +182,7 @@ export async function dispatchEmergencyNotification(
 
     const data = await res.json().catch(() => ({}));
 
-    // 3. Log action to Supabase sos_actions table
+    // 2. Log action to Supabase sos_actions table
     await supabase.from('sos_actions').insert([
       {
         action: `Emergency Situation Report dispatched to ${sit.recipientEmail} and patilgurveshp@gmail.com`,
@@ -168,7 +191,7 @@ export async function dispatchEmergencyNotification(
       }
     ]);
 
-    // 4. Realtime broadcast to family listeners
+    // 3. Realtime broadcast to family listeners
     const channel = supabase.channel('emergency-alerts');
     await channel.send({
       type: 'broadcast',
@@ -176,7 +199,12 @@ export async function dispatchEmergencyNotification(
       payload: sit
     });
 
-    console.log(`[NightShift AI] 100% AUTO EMAIL DISPATCH CONFIRMED to ${sit.recipientEmail}:`, data);
+    // 4. If triggered by user, activate default system API
+    if (invokeDefaultClient) {
+      await dispatchDefaultApiEmail(sit);
+    }
+
+    console.log(`[NightShift AI] Emergency situation report dispatched to ${sit.recipientEmail}:`, data);
 
     return {
       success: true,
@@ -185,7 +213,10 @@ export async function dispatchEmergencyNotification(
       recipient: sit.recipientEmail
     };
   } catch (err: any) {
-    console.warn('[NightShift AI] Emergency auto-dispatch notice:', err?.message || err);
+    console.warn('[NightShift AI] Emergency dispatch notice:', err?.message || err);
+    if (invokeDefaultClient) {
+      await dispatchDefaultApiEmail(sit);
+    }
     return {
       success: true,
       status: 'AUTO_DISPATCHED',

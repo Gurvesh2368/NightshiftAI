@@ -111,34 +111,7 @@ function emergencyEmailPlugin(): Plugin {
               let previewUrl = '';
               let messageId = `msg_${Date.now()}`;
 
-              // 1. Direct FormSubmit AJAX Dispatch (Guaranteed delivery to activated token)
-              try {
-                await fetch('https://formsubmit.co/ajax/300a25d6c7d935a2480209906e358dc7', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Origin': 'http://localhost:5173',
-                    'Referer': 'http://localhost:5173/'
-                  },
-                  body: JSON.stringify({
-                    _subject: subject,
-                    _captcha: 'false',
-                    _template: 'box',
-                    message: payload.body || subject,
-                    "URGENT SITUATION REPORT": payload.body || subject,
-                    "Worker": payload.workerName || 'Gurvesh Patil',
-                    "Location": payload.locationName || 'Near BKC Central Interchange',
-                    "Coordinates": `${payload.coords?.lat || 19.0680}, ${payload.coords?.lng || 72.8745}`,
-                    "Live Tracking Stream": trackingUrl
-                  })
-                });
-                console.log('✅ FormSubmit Emergency Dispatch Confirmed to cricledge8292@gmail.com');
-              } catch (fsErr: any) {
-                console.warn('[NightShift Mailer] FormSubmit notice:', fsErr.message);
-              }
-
-              // 2. Nodemailer Dispatch
+              // Direct Nodemailer Dispatch with Relevant Emergency Situation Content
               if (transporter) {
                 try {
                   const info = await transporter.sendMail({

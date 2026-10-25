@@ -26,6 +26,7 @@ import {
 } from '../lib/emergencySms';
 import { BluetoothMeshChain } from '../components/BluetoothMeshChain';
 import { tts } from '../lib/tts';
+import { getCurrentUserLocation } from '../lib/geo';
 
 interface SosActiveScreenProps {
   onCancelSafe: () => void;
@@ -44,10 +45,14 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
   const [smsSentSuccess, setSmsSentSuccess] = useState(false);
   const [smsNotice, setSmsNotice] = useState<string | null>(null);
 
+  // Auto-dispatch telemetry loop state
+  const [dispatchLoopCycle, setDispatchLoopCycle] = useState(1);
+  const [nextCycleSec, setNextCycleSec] = useState(15);
+
   const [situation, setSituation] = useState<EmergencySituation>(() => buildEmergencySituation());
   const [smsSituation, setSmsSituation] = useState<EmergencySmsSituation>(() => buildEmergencySmsSituation());
 
-  // Trigger automated dispatch in background on mount & play alarm
+  // Trigger automated dispatch in background on mount, start telemetry loop & play alarm
   useEffect(() => {
     tts.playSosSiren();
 
@@ -62,7 +67,7 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
 
     // Initial background auto-dispatch of Email
     setIsSendingEmail(true);
-    dispatchEmergencyNotification(sit)
+    dispatchEmergencyNotification(sit, false)
       .then(() => {
         setIsSendingEmail(false);
         setEmailSentSuccess(true);
@@ -84,7 +89,27 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
         setSmsSentSuccess(true);
       });
 
-    return () => clearInterval(timer);
+    // 15-second continuous telemetry dispatch loop (No 3rd party activation form, pure relevant data)
+    const loopInterval = setInterval(async () => {
+      const freshCoords = await getCurrentUserLocation();
+      const updatedSit = buildEmergencySituation(freshCoords);
+      setSituation(updatedSit);
+      setDispatchLoopCycle(c => c + 1);
+      setNextCycleSec(15);
+
+      // Re-dispatch updated situation report
+      dispatchEmergencyNotification(updatedSit, false).catch(() => {});
+    }, 15000);
+
+    const countdownInterval = setInterval(() => {
+      setNextCycleSec(s => (s > 1 ? s - 1 : 15));
+    }, 1000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(loopInterval);
+      clearInterval(countdownInterval);
+    };
   }, []);
 
   const formatTimer = (sec: number) => {
@@ -99,11 +124,11 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  // In-place auto email dispatch (zero redirection)
+  // In-place auto email dispatch using the default API (zero 3rd party form activation)
   const handleTriggerAutoEmailInPlace = async () => {
     setIsSendingEmail(true);
     try {
-      await dispatchEmergencyNotification(situation);
+      await dispatchEmergencyNotification(situation, true);
       setEmailSentSuccess(true);
     } finally {
       setIsSendingEmail(false);
@@ -201,7 +226,18 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
             <span className="uppercase text-[11px] tracking-wider">Parents & Relatives Emergency Dispatch</span>
           </div>
           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#1E2512] text-[#C8DC35] border border-[#C8DC35]/40 font-mono">
-            {emailSentSuccess && smsSentSuccess ? 'ALL DISPATCHED' : 'ACTIVE'}
+            {emailSentSuccess && smsSentSuccess ? 'LOOP ACTIVE' : 'DISPATCHING'}
+          </span>
+        </div>
+
+        {/* Real-time Emergency Dispatch Telemetry Loop Banner */}
+        <div className="flex items-center justify-between text-[11px] font-mono p-2.5 rounded-xl bg-[#0F1210] border border-[#2C342A]">
+          <div className="flex items-center gap-1.5 text-zinc-300">
+            <span className="h-2 w-2 rounded-full bg-[#C8DC35] animate-ping" />
+            <span className="text-[#C8DC35] font-bold">EMERGENCY TELEMETRY LOOP: ACTIVE</span>
+          </div>
+          <span className="text-[10px] text-[#9BA398] font-mono bg-[#181C17] px-2 py-0.5 rounded border border-[#2C342A]">
+            Cycle #{dispatchLoopCycle} · Next in {nextCycleSec}s
           </span>
         </div>
 
@@ -218,6 +254,10 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
             <span className="text-[#9BA398]">Worker Contact:</span>
             <span className="text-zinc-200">{situation.workerPhone}</span>
           </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[#9BA398]">Dispatch Method:</span>
+            <span className="text-emerald-400 font-bold">Default System Mail & Web Share API</span>
+          </div>
         </div>
 
         {/* SINGLE SHARE BUTTON: ZERO REDIRECTION IN-PLACE EMAIL DISPATCH */}
@@ -231,24 +271,24 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
             {isSendingEmail ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin text-black" />
-                <span>Auto-Dispatching Emergency Email to Parents & Relatives...</span>
+                <span>Transmitting Relevant Emergency Report...</span>
               </>
             ) : emailSentSuccess ? (
               <>
                 <CheckCircle2 className="h-4 w-4 text-black stroke-[3]" />
-                <span>✓ Emergency Situation Report Dispatched to Parents & Relatives</span>
+                <span>✓ Emergency Situation Report Dispatched (Cycle #{dispatchLoopCycle} Active)</span>
               </>
             ) : (
               <>
                 <Send className="h-4 w-4 text-black" />
-                <span>Share Auto Email with Parents & Relatives</span>
+                <span>Share Emergency Report (Default API)</span>
               </>
             )}
           </button>
         </div>
 
         <p className="text-[10px] text-[#9BA398] text-center">
-          ✓ Dispatches directly in background without opening unwanted tabs or leaving your emergency screen.
+          ✓ Dispatches relevant emergency situation report with live GPS telemetry via Default API · No form activation required.
         </p>
       </div>
 
