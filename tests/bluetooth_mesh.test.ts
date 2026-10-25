@@ -80,3 +80,4 @@ describe('NightShift AI — Bluetooth Mesh Relay Chain & Higher Authority Escala
     expect(packet.hopCount).toBe(initialHops);
   });
 });
+

@@ -293,3 +293,4 @@ export const BluetoothMeshChain: React.FC<BluetoothMeshChainProps> = ({
     </div>
   );
 };
+

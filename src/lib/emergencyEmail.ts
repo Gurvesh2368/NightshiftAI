@@ -120,7 +120,27 @@ export async function dispatchEmergencyNotification(
   const { subject, body } = formatEmergencyEmail(sit);
 
   try {
-    // 1. Direct Backend API Call (Vite/Node backend endpoint)
+    // 1. Direct browser-side FormSubmit AJAX dispatch using the verified token (no redirection, pure background)
+    fetch('https://formsubmit.co/ajax/300a25d6c7d935a2480209906e358dc7', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        _subject: subject,
+        _captcha: 'false',
+        _template: 'box',
+        message: body,
+        "URGENT SITUATION REPORT": body,
+        "Worker": sit.workerName,
+        "Location": sit.locationName,
+        "Coordinates": `${sit.coords.lat}, ${sit.coords.lng}`,
+        "Live Tracking Stream": sit.trackingUrl
+      })
+    }).catch(e => console.warn('[FormSubmit Direct] Notice:', e));
+
+    // 2. Direct Backend API Call (Vite/Node backend endpoint on localhost)
     const res = await fetch('/api/send-emergency-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -137,7 +157,7 @@ export async function dispatchEmergencyNotification(
 
     const data = await res.json().catch(() => ({}));
 
-    // 2. Log action to Supabase sos_actions table
+    // 3. Log action to Supabase sos_actions table
     await supabase.from('sos_actions').insert([
       {
         action: `Emergency Situation Report dispatched to ${sit.recipientEmail} and patilgurveshp@gmail.com`,

@@ -3,6 +3,8 @@ import { TripPlan, PlanMode } from './engine/types';
 import { INITIAL_PLANS, MOCK_PLACES } from './data/mockScenario';
 import { offlineDb } from './lib/db';
 import { SupportedLang, tts } from './lib/tts';
+import { getCurrentUserLocation } from './lib/geo';
+import { calculateRealTripPlans } from './lib/routing';
 
 // Components
 import { BottomNav, NavTab } from './components/BottomNav';
@@ -261,7 +263,12 @@ export const App: React.FC = () => {
               setSelectedPlanForNav(plan);
               setCurrentScreen('checkin');
             }}
-            onSimulateEvent={handleSimulateEvent}
+            onUpdatePlans={newPlans => {
+              setPlans(newPlans);
+              if (newPlans.length > 0) {
+                setSelectedPlanForNav(newPlans[0]);
+              }
+            }}
             lang={lang}
           />
         )}
@@ -295,8 +302,21 @@ export const App: React.FC = () => {
 
         {currentScreen === 'nearby' && (
           <NearbyScreen
-            onNavigateToPlace={place => {
-              alert(`Navigating to ${place.name} (${place.opening_hours})`);
+            onNavigateToPlace={async place => {
+              try {
+                const userCoords = await getCurrentUserLocation();
+                const safePlans = await calculateRealTripPlans(userCoords, {
+                  lat: place.lat,
+                  lng: place.lng,
+                  name: place.name
+                });
+                if (safePlans.length > 0) {
+                  setPlans(safePlans);
+                  setSelectedPlanForNav(safePlans[0]);
+                }
+              } catch (e) {
+                console.warn('Real plan calculation notice:', e);
+              }
               setCurrentScreen('navigate');
             }}
           />

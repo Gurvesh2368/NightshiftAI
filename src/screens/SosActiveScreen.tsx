@@ -220,24 +220,23 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
           </div>
         </div>
 
-        {/* DUAL ACTION BUTTONS: IN-PLACE EMAIL DISPATCH & DIRECT SMS TRIGGER */}
-        <div className="space-y-2 pt-1">
-          {/* EMAIL DISPATCH BUTTON */}
+        {/* SINGLE SHARE BUTTON: ZERO REDIRECTION IN-PLACE EMAIL DISPATCH */}
+        <div className="pt-1">
           <button
             type="button"
             onClick={handleTriggerAutoEmailInPlace}
             disabled={isSendingEmail}
-            className="w-full py-3 px-4 rounded-xl bg-[#C8DC35] hover:bg-[#D4E83E] text-[#0F1210] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
+            className="w-full py-3.5 px-4 rounded-xl bg-[#C8DC35] hover:bg-[#D4E83E] text-[#0F1210] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
           >
             {isSendingEmail ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin text-black" />
-                <span>Transmitting Auto Email to Parents & Relatives...</span>
+                <span>Auto-Dispatching Emergency Email to Parents & Relatives...</span>
               </>
             ) : emailSentSuccess ? (
               <>
                 <CheckCircle2 className="h-4 w-4 text-black stroke-[3]" />
-                <span>✓ Auto Email Shared with Parents & Relatives</span>
+                <span>✓ Emergency Situation Report Dispatched to Parents & Relatives</span>
               </>
             ) : (
               <>
@@ -246,38 +245,7 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
               </>
             )}
           </button>
-
-          {/* SMS DISPATCH BUTTON */}
-          <button
-            type="button"
-            onClick={handleTriggerSms}
-            disabled={isSendingSms}
-            className="w-full py-3 px-4 rounded-xl bg-[#1E2512] hover:bg-[#283218] border border-[#C8DC35]/60 text-[#C8DC35] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
-          >
-            {isSendingSms ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin text-[#C8DC35]" />
-                <span>Dispatching Emergency SMS Alert...</span>
-              </>
-            ) : smsSentSuccess ? (
-              <>
-                <CheckCircle2 className="h-4 w-4 text-[#C8DC35]" />
-                <span>✓ Emergency SMS Dispatched ({smsSituation.recipientPhone})</span>
-              </>
-            ) : (
-              <>
-                <MessageSquare className="h-4 w-4 text-[#C8DC35]" />
-                <span>Send Emergency SMS to Family ({smsSituation.recipientPhone})</span>
-              </>
-            )}
-          </button>
         </div>
-
-        {smsNotice && (
-          <div className="p-2.5 rounded-lg bg-[#1E2512] border border-[#C8DC35]/50 text-[#C8DC35] text-[11px] font-semibold text-center animate-in fade-in">
-            {smsNotice}
-          </div>
-        )}
 
         <p className="text-[10px] text-[#9BA398] text-center">
           ✓ Dispatches directly in background without opening unwanted tabs or leaving your emergency screen.
