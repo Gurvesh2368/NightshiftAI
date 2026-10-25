@@ -1,0 +1,122 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+:root {
+  /* Tactical Pear Color Palette */
+  --pear-primary: #C8DC35;
+  --pear-hover: #D4E83E;
+  --pear-dark: #1E2512;
+  --pear-border: rgba(200, 220, 53, 0.35);
+
+  /* Bold Safety Red Palette */
+  --red-primary: #DC2626;
+  --red-hover: #B91C1C;
+  --red-dark: #2A1215;
+  --red-border: rgba(220, 38, 38, 0.4);
+
+  /* Grounded Non-AI Dark Canvas */
+  --bg-primary: #0F1210;
+  --surface: #181C17;
+  --surface-raised: #212620;
+  --surface-border: #2C342A;
+  --button-neutral: #252B23;
+  --button-neutral-hover: #2F362C;
+
+  --text-main: #F4F6F2;
+  --text-muted: #9BA398;
+  --radius-card: 20px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0F1210;
+}
+::-webkit-scrollbar-thumb {
+  background: #252B23;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #363F33;
+}
+
+/* Distinctive Pear + Red Top Header Accent Strip */
+.gradient-bar {
+  background: linear-gradient(90deg, #C8DC35 0%, #EAB308 45%, #DC2626 100%);
+  height: 4px;
+}
+
+/* Tactile Functional Pear CTA Button */
+.pear-cta {
+  background: #C8DC35;
+  color: #0F1210;
+  font-weight: 800;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pear-cta:hover {
+  background: #D4E83E;
+}
+.pear-cta:active {
+  transform: scale(0.98);
+}
+
+/* Urgent Safety Red CTA */
+.red-cta {
+  background: #DC2626;
+  color: #FFFFFF;
+  font-weight: 800;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.red-cta:hover {
+  background: #B91C1C;
+}
+.red-cta:active {
+  transform: scale(0.98);
+}
+
+.gradient-sos {
+  background: radial-gradient(circle, #DC2626 0%, #7F1D1D 100%);
+  box-shadow: 0 0 35px rgba(220, 38, 38, 0.45);
+}
+
+/* Pulsing GPS dot for live navigation */
+@keyframes blueDotPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(200, 220, 53, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(200, 220, 53, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(200, 220, 53, 0);
+  }
+}
+
+.blue-dot {
+  width: 16px;
+  height: 16px;
+  background-color: #C8DC35;
+  border: 3px solid #0F1210;
+  border-radius: 50%;
+  animation: blueDotPulse 2s infinite;
+}
+
+/* Hold SOS progress ring */
+.sos-progress-ring circle {
+  transition: stroke-dashoffset 0.1s linear;
+}
