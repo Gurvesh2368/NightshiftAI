@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getStoredCoords } from './geo';
 
 export interface EmergencySmsSituation {
   workerName: string;
@@ -14,20 +15,22 @@ export interface EmergencySmsSituation {
 }
 
 export function buildEmergencySmsSituation(
-  coords: { lat: number; lng: number } = { lat: 19.0680, lng: 72.8745 }
+  coords?: { lat: number; lng: number }
 ): EmergencySmsSituation {
+  const resolvedCoords = coords || getStoredCoords();
   const workerName = (import.meta as any).env?.VITE_USER_NAME || 'Gurvesh Patil';
   const recipientPhone = (import.meta as any).env?.VITE_EMERGENCY_PHONE || '+91 98200 11223';
   const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
-  const trackingUrl = `${origin}/?view=contact_alert&lat=${coords.lat}&lng=${coords.lng}&user=${encodeURIComponent(workerName)}`;
+  const liveCity = (typeof localStorage !== 'undefined' && localStorage.getItem('nightshift_live_city')) || 'Nagpur';
+  const trackingUrl = `${origin}/?view=contact_alert&lat=${resolvedCoords.lat}&lng=${resolvedCoords.lng}&user=${encodeURIComponent(workerName)}`;
 
   return {
     workerName,
     workerPhone: '+91 98765 43210',
     recipientPhone,
     recipientName: 'Family / Emergency Contact',
-    coords,
-    locationName: 'Near BKC Central Interchange (Opposite City Hospital Emergency)',
+    coords: resolvedCoords,
+    locationName: `Live Telemetry Sector · ${liveCity} (${resolvedCoords.lat.toFixed(4)}, ${resolvedCoords.lng.toFixed(4)})`,
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     bloodGroup: 'O+ (Universal Donor)',
     allergies: 'No known drug allergies',

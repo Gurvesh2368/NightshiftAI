@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getStoredCoords } from './geo';
 
 export interface EmergencySituation {
   workerName: string;
@@ -17,15 +18,16 @@ export interface EmergencySituation {
 }
 
 export function buildEmergencySituation(
-  coords: { lat: number; lng: number } = { lat: 19.0680, lng: 72.8745 },
+  coords?: { lat: number; lng: number },
   triggerType: 'hold_button' | 'voice_help' | 'missed_checkin' | 'manual' = 'hold_button'
 ): EmergencySituation {
-  // Configured primary family emergency email
+  const resolvedCoords = coords || getStoredCoords();
   const recipientEmail = import.meta.env.VITE_EMERGENCY_EMAIL || 'cricledge8292@gmail.com';
   const workerName = import.meta.env.VITE_USER_NAME || 'Gurvesh Patil';
   const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
+  const liveCity = (typeof localStorage !== 'undefined' && localStorage.getItem('nightshift_live_city')) || 'Nagpur';
 
-  const trackingUrl = `${origin}/?view=contact_alert&lat=${coords.lat}&lng=${coords.lng}&user=${encodeURIComponent(workerName)}`;
+  const trackingUrl = `${origin}/?view=contact_alert&lat=${resolvedCoords.lat}&lng=${resolvedCoords.lng}&user=${encodeURIComponent(workerName)}`;
 
   return {
     workerName,
@@ -34,8 +36,8 @@ export function buildEmergencySituation(
     recipientEmail,
     recipientName: 'Family Member',
     triggerType,
-    coords,
-    locationName: 'Near BKC Central Interchange (Opposite City Hospital Emergency)',
+    coords: resolvedCoords,
+    locationName: `Live Telemetry Sector · ${liveCity} (${resolvedCoords.lat.toFixed(4)}, ${resolvedCoords.lng.toFixed(4)})`,
     batteryLevel: '78% · Cellular 4G Connected',
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     bloodGroup: 'O+ (Universal Donor)',

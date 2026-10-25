@@ -17,43 +17,148 @@ export interface GeocodedAddress {
   postcode?: string;
 }
 
-// Default Mumbai fallback if user denies or lacks GPS
-export const DEFAULT_COORDS: GeoCoordinates = {
-  lat: 19.0680,
-  lng: 72.8745,
-  accuracy: 10
-};
+// Read cached live coordinates or fall back to India central location
+export function getStoredCoords(): GeoCoordinates {
+  try {
+    const saved = localStorage.getItem('nightshift_live_coords');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.lat && parsed.lng) return parsed;
+    }
+  } catch {}
+  return {
+    lat: 21.1463,
+    lng: 79.0849,
+    accuracy: 25
+  };
+}
+
+export const DEFAULT_COORDS: GeoCoordinates = getStoredCoords();
+
+/**
+ * Resolves live real-world coordinates via IP Geolocation APIs (Zero hardware GPS required)
+ */
+export async function fetchLiveIpCoordinates(): Promise<GeoCoordinates> {
+  // 1. Try local Vite server backend endpoint
+  try {
+    const res = await fetch('/api/live-location');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.lat && data.lng) {
+        const coords: GeoCoordinates = {
+          lat: parseFloat(data.lat),
+          lng: parseFloat(data.lng),
+          accuracy: 50
+        };
+        try {
+          localStorage.setItem('nightshift_live_coords', JSON.stringify(coords));
+          localStorage.setItem('nightshift_live_city', data.city || 'Nagpur');
+        } catch {}
+        return coords;
+      }
+    }
+  } catch (_) {}
+
+  // 2. Direct HTTPS fallback to FreeIPAPI
+  try {
+    const res = await fetch('https://freeipapi.com/api/json');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        const coords: GeoCoordinates = {
+          lat: parseFloat(data.latitude),
+          lng: parseFloat(data.longitude),
+          accuracy: 100
+        };
+        try {
+          localStorage.setItem('nightshift_live_coords', JSON.stringify(coords));
+          localStorage.setItem('nightshift_live_city', data.cityName || 'Nagpur');
+        } catch {}
+        return coords;
+      }
+    }
+  } catch (_) {}
+
+  // 3. Direct HTTP fallback to IP-API
+  try {
+    const res = await fetch('http://ip-api.com/json');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.lat && data.lon) {
+        const coords: GeoCoordinates = {
+          lat: parseFloat(data.lat),
+          lng: parseFloat(data.lon),
+          accuracy: 100
+        };
+        try {
+          localStorage.setItem('nightshift_live_coords', JSON.stringify(coords));
+          localStorage.setItem('nightshift_live_city', data.city || 'Nagpur');
+        } catch {}
+        return coords;
+      }
+    }
+  } catch (_) {}
+
+  return getStoredCoords();
+}
 
 /**
  * Gets the current real user GPS coordinates using browser Geolocation API
+ * with automatic, instant IP-based geolocation fallback for desktop PCs/laptops.
  */
 export function getCurrentUserLocation(): Promise<GeoCoordinates> {
-  return new Promise(resolve => {
+  return new Promise(async resolve => {
+    // If browser doesn't have geolocation, resolve via live IP API immediately
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      resolve(DEFAULT_COORDS);
+      const ipCoords = await fetchLiveIpCoordinates();
+      resolve(ipCoords);
       return;
     }
 
+    let hasResolved = false;
+
+    // Timeout safety: if browser GPS prompt or hardware takes > 3.5s, fall back to live IP API
+    const fallbackTimer = setTimeout(async () => {
+      if (!hasResolved) {
+        hasResolved = true;
+        const ipCoords = await fetchLiveIpCoordinates();
+        resolve(ipCoords);
+      }
+    }, 3500);
+
     navigator.geolocation.getCurrentPosition(
       pos => {
-        resolve({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: Math.round(pos.coords.accuracy),
-          altitude: pos.coords.altitude,
-          heading: pos.coords.heading,
-          speed: pos.coords.speed,
-          timestamp: pos.timestamp
-        });
+        if (!hasResolved) {
+          hasResolved = true;
+          clearTimeout(fallbackTimer);
+          const coords: GeoCoordinates = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: Math.round(pos.coords.accuracy),
+            altitude: pos.coords.altitude,
+            heading: pos.coords.heading,
+            speed: pos.coords.speed,
+            timestamp: pos.timestamp
+          };
+          try {
+            localStorage.setItem('nightshift_live_coords', JSON.stringify(coords));
+          } catch {}
+          resolve(coords);
+        }
       },
-      err => {
-        console.warn('[Geo] Live GPS error or permission denied:', err.message);
-        resolve(DEFAULT_COORDS);
+      async err => {
+        if (!hasResolved) {
+          hasResolved = true;
+          clearTimeout(fallbackTimer);
+          console.warn('[Geo] Hardware GPS unavailable, using live network IP geolocation:', err.message);
+          const ipCoords = await fetchLiveIpCoordinates();
+          resolve(ipCoords);
+        }
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000
+        timeout: 3000,
+        maximumAge: 10000
       }
     );
   });
@@ -145,3 +250,4 @@ export async function getLiveBatteryLevel(): Promise<string> {
   }
   return '84% · Normal';
 }
+

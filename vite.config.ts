@@ -43,6 +43,49 @@ function emergencyEmailPlugin(): Plugin {
   return {
     name: 'emergency-email-plugin',
     configureServer(server) {
+      // Live Device & IP Geolocation Resolver
+      server.middlewares.use('/api/live-location', async (_req, res) => {
+        try {
+          const ipRes = await fetch('https://freeipapi.com/api/json');
+          if (ipRes.ok) {
+            const data: any = await ipRes.json();
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            return res.end(
+              JSON.stringify({
+                lat: data.latitude || 21.1463,
+                lng: data.longitude || 79.0849,
+                city: data.cityName || 'Nagpur',
+                region: data.regionName || 'Maharashtra',
+                country: data.countryName || 'India'
+              })
+            );
+          }
+        } catch (_) {}
+
+        try {
+          const ipRes2 = await fetch('http://ip-api.com/json');
+          if (ipRes2.ok) {
+            const data2: any = await ipRes2.json();
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            return res.end(
+              JSON.stringify({
+                lat: data2.lat || 21.1463,
+                lng: data2.lon || 79.0849,
+                city: data2.city || 'Nagpur',
+                region: data2.regionName || 'Maharashtra',
+                country: data2.country || 'India'
+              })
+            );
+          }
+        } catch (_) {}
+
+        res.setHeader('Content-Type', 'application/json');
+        res.statusCode = 200;
+        res.end(JSON.stringify({ lat: 21.1463, lng: 79.0849, city: 'Nagpur', region: 'Maharashtra' }));
+      });
+
       server.middlewares.use('/api/send-emergency-email', async (req, res) => {
         if (req.method === 'POST') {
           let body = '';

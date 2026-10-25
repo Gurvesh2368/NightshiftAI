@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { OfflinePlace } from '../lib/db';
+import { getStoredCoords } from '../lib/geo';
 
 interface MapViewProps {
   routeCoordinates?: [number, number][]; // [[lng, lat], ...]
@@ -21,8 +22,8 @@ export const MapView: React.FC<MapViewProps> = ({
   places = [],
   onSelectPlace,
   className = 'h-64 w-full',
-  zoom = 13.5,
-  center = [72.8700, 19.0700],
+  zoom = 14,
+  center,
   interactive = true
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -30,6 +31,9 @@ export const MapView: React.FC<MapViewProps> = ({
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
   const placeMarkersRef = useRef<maplibregl.Marker[]>([]);
   const [mapTheme, setMapTheme] = useState<'spinal' | 'osm'>('spinal');
+
+  const defaultCoords = getStoredCoords();
+  const effectiveCenter: [number, number] = currentPosition || center || [defaultCoords.lng, defaultCoords.lat];
 
   const buildStyle = (theme: 'spinal' | 'osm'): maplibregl.StyleSpecification => {
     if (theme === 'spinal') {
@@ -101,7 +105,7 @@ export const MapView: React.FC<MapViewProps> = ({
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    const initialCenter = currentPosition || center;
+    const initialCenter = effectiveCenter;
 
     const map = new maplibregl.Map({
       container: mapContainer.current,
@@ -116,6 +120,12 @@ export const MapView: React.FC<MapViewProps> = ({
 
     if (interactive) {
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+      const geolocate = new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showUserLocation: true
+      });
+      map.addControl(geolocate, 'top-right');
     }
 
     const addRoutePolylines = () => {
@@ -210,6 +220,22 @@ export const MapView: React.FC<MapViewProps> = ({
       mapRef.current = null;
     };
   }, []);
+
+  // Dynamic Re-center when live user position or center updates
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const target = currentPosition || center;
+    if (target && target[0] && target[1]) {
+      if (!routeCoordinates || routeCoordinates.length <= 1) {
+        map.flyTo({
+          center: target,
+          zoom: zoom || 15,
+          essential: true
+        });
+      }
+    }
+  }, [currentPosition?.[0], currentPosition?.[1], center?.[0], center?.[1]]);
 
   // Update Route Polyline
   useEffect(() => {

@@ -101,15 +101,38 @@ export const BluetoothMeshChain: React.FC<BluetoothMeshChainProps> = ({
         </div>
 
         <span
-          className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-extrabold uppercase tracking-wider ${
+          className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-extrabold uppercase tracking-wider flex items-center gap-1.5 ${
             isDispatched
               ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/50'
-              : isRelaying
-              ? 'bg-[#1E2512] text-[#C8DC35] border border-[#C8DC35]/60 animate-pulse'
+              : meshState.isLoopActive
+              ? 'bg-[#1E2512] text-[#C8DC35] border border-[#C8DC35]/60'
               : 'bg-zinc-800 text-zinc-400'
           }`}
         >
-          {isDispatched ? 'AUTHORITY ENGAGED' : isRelaying ? `HOP ${packet?.hopCount || 1} RELAYING` : 'STANDBY'}
+          {meshState.isLoopActive && <span className="h-1.5 w-1.5 rounded-full bg-[#C8DC35] animate-ping" />}
+          {isDispatched
+            ? `112 AUTHORITY ENGAGED · CYCLE #${meshState.loopCycle}`
+            : meshState.isLoopActive
+            ? `LOOP CYCLE #${meshState.loopCycle} · RELAYING`
+            : 'MESH STANDBY'}
+        </span>
+      </div>
+
+      {/* Web Bluetooth API Status Banner */}
+      <div className="flex items-center justify-between text-[11px] font-mono bg-[#0F1210] p-2.5 rounded-xl border border-[#2C342A]">
+        <div className="flex items-center gap-1.5 text-zinc-300">
+          <Signal className="h-3.5 w-3.5 text-[#C8DC35]" />
+          <span>Web Bluetooth API:</span>
+          <span className="text-[#C8DC35] font-bold">
+            {meshState.bleConnected
+              ? `Connected (${meshState.connectedDeviceName || 'BLE Hardware'})`
+              : meshState.bluetoothSupported
+              ? 'Default Browser API Armed'
+              : '2.4 GHz Multi-Tab Broadcast Channel'}
+          </span>
+        </div>
+        <span className="text-[10px] text-[#9BA398] bg-[#181C17] px-2 py-0.5 rounded border border-[#2C342A]">
+          Heartbeat: 2.8s
         </span>
       </div>
 
@@ -258,10 +281,10 @@ export const BluetoothMeshChain: React.FC<BluetoothMeshChainProps> = ({
           onClick={handleScanPhysicalBle}
           disabled={isScanningBle}
           className="py-3 px-3 rounded-xl bg-[#181C17] hover:bg-[#222820] border border-[#2C342A] text-zinc-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          title="Pair or scan external BLE peripheral"
+          title="Pair physical BLE peripheral using native Web Bluetooth API"
         >
           <Signal className="h-4 w-4 text-[#C8DC35]" />
-          <span>{isScanningBle ? 'Scanning...' : 'Pair BLE'}</span>
+          <span>{isScanningBle ? 'Scanning...' : 'Pair Web Bluetooth'}</span>
         </button>
       </div>
 

@@ -41,9 +41,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [plans, setPlans] = useState<TripPlan[]>(initialPlans);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [userCoords, setUserCoords] = useState<GeoCoordinates>(DEFAULT_COORDS);
-  const [currentAddress, setCurrentAddress] = useState<string>('Near BKC Central Interchange, Mumbai');
+  const [currentAddress, setCurrentAddress] = useState<string>(() => {
+    const savedCity = typeof localStorage !== 'undefined' ? localStorage.getItem('nightshift_live_city') : null;
+    return savedCity ? `Live in ${savedCity} · Connecting Telemetry...` : 'Detecting Live Position...';
+  });
   const [batteryStatus, setBatteryStatus] = useState<string>('84% · Normal');
-  const [selectedDestName, setSelectedDestName] = useState<string>('Bandra Kurla Complex (BKC)');
+  const [selectedDestName, setSelectedDestName] = useState<string>('Search Destination');
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
   // Sync external plans if passed

@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Hospital
 } from 'lucide-react';
+import { getStoredCoords, reverseGeocode } from '../lib/geo';
 
 interface ContactAlertPageProps {
   workerName?: string;
@@ -23,9 +24,21 @@ export const ContactAlertPage: React.FC<ContactAlertPageProps> = ({
   workerName = 'Gurvesh Patil',
   onBackToApp
 }) => {
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const initialLat = urlParams?.get('lat') ? parseFloat(urlParams.get('lat')!) : getStoredCoords().lat;
+  const initialLng = urlParams?.get('lng') ? parseFloat(urlParams.get('lng')!) : getStoredCoords().lng;
+  const initialUser = urlParams?.get('user') || workerName;
+
   const [acknowledged, setAcknowledged] = useState(false);
   const [secondsSinceLastPing, setSecondsSinceLastPing] = useState(4);
-  const [coords, setCoords] = useState<[number, number]>([72.8685, 19.0680]);
+  const [coords, setCoords] = useState<[number, number]>([initialLng, initialLat]);
+  const [locationName, setLocationName] = useState<string>('Live GPS Telemetry Stream');
+
+  useEffect(() => {
+    reverseGeocode(initialLat, initialLng).then(addr => {
+      setLocationName(addr);
+    });
+  }, [initialLat, initialLng]);
 
   // Simulate live telemetry ping every 5 seconds
   useEffect(() => {
@@ -33,14 +46,14 @@ export const ContactAlertPage: React.FC<ContactAlertPageProps> = ({
       setSecondsSinceLastPing(s => {
         if (s > 15) {
           // slight jitter simulating live GPS movement
-          setCoords([72.8685 + (Math.random() - 0.5) * 0.0003, 19.0680 + (Math.random() - 0.5) * 0.0003]);
+          setCoords([initialLng + (Math.random() - 0.5) * 0.0003, initialLat + (Math.random() - 0.5) * 0.0003]);
           return 1;
         }
         return s + 1;
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [initialLat, initialLng]);
 
   const googleMapsUrl = `https://www.google.com/maps?q=${coords[1]},${coords[0]}`;
 
@@ -100,7 +113,7 @@ export const ContactAlertPage: React.FC<ContactAlertPageProps> = ({
           <span className="font-bold uppercase tracking-wider text-[#A3A8B0] text-[10px]">
             Incident Telemetry
           </span>
-          <span className="text-zinc-400">Near BKC Central Interchange</span>
+          <span className="text-zinc-400 truncate max-w-[200px]">{locationName}</span>
         </div>
 
         <div className="space-y-1.5 text-zinc-300">

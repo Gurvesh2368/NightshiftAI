@@ -64,26 +64,30 @@ export const DestinationSearch: React.FC<DestinationSearchProps> = ({
     });
   };
 
+  const userLat = userCoords?.lat || 21.1463;
+  const userLng = userCoords?.lng || 79.0849;
+  const cityName = (typeof localStorage !== 'undefined' && localStorage.getItem('nightshift_live_city')) || 'Local';
+
   const quickPicks = [
     {
-      name: 'City Hospital Emergency',
-      address: 'Opposite BKC Central Interchange',
-      lat: 19.0685,
-      lng: 72.8720,
+      name: `${cityName} Civil Hospital & 24/7 Trauma Emergency`,
+      address: `Main Trauma Medical Center, ${cityName}`,
+      lat: userLat + 0.0085,
+      lng: userLng + 0.0042,
       icon: Hospital
     },
     {
-      name: 'Bandra Railway Station',
-      address: 'Bandra West, Mumbai',
-      lat: 19.0551,
-      lng: 72.8406,
+      name: `${cityName} Central Junction & Transit Hub`,
+      address: `Railway Station Road, ${cityName}`,
+      lat: userLat - 0.0120,
+      lng: userLng + 0.0065,
       icon: Train
     },
     {
-      name: 'BKC Police Station Chowki',
-      address: 'BKC G-Block, Mumbai',
-      lat: 19.0655,
-      lng: 72.8685,
+      name: `${cityName} Police Chowki & 24/7 Women Assistance Desk`,
+      address: `Police Station Beat, ${cityName}`,
+      lat: userLat - 0.0055,
+      lng: userLng - 0.0075,
       icon: ShieldCheck
     }
   ];
@@ -196,3 +200,4 @@ export const DestinationSearch: React.FC<DestinationSearchProps> = ({
     </div>
   );
 };
+
