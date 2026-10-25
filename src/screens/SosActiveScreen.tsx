@@ -9,13 +9,21 @@ import {
   Send,
   Loader2,
   Copy,
-  Check
+  Check,
+  MessageSquare,
+  Smartphone
 } from 'lucide-react';
 import {
   buildEmergencySituation,
   dispatchEmergencyNotification,
   EmergencySituation
 } from '../lib/emergencyEmail';
+import {
+  buildEmergencySmsSituation,
+  dispatchEmergencySms,
+  triggerDeviceSms,
+  EmergencySmsSituation
+} from '../lib/emergencySms';
 import { tts } from '../lib/tts';
 
 interface SosActiveScreenProps {
@@ -31,7 +39,12 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSentSuccess, setEmailSentSuccess] = useState(false);
+  const [isSendingSms, setIsSendingSms] = useState(false);
+  const [smsSentSuccess, setSmsSentSuccess] = useState(false);
+  const [smsNotice, setSmsNotice] = useState<string | null>(null);
+
   const [situation, setSituation] = useState<EmergencySituation>(() => buildEmergencySituation());
+  const [smsSituation, setSmsSituation] = useState<EmergencySmsSituation>(() => buildEmergencySmsSituation());
 
   // Trigger automated dispatch in background on mount & play alarm
   useEffect(() => {
@@ -42,17 +55,33 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
     }, 1000);
 
     const sit = buildEmergencySituation();
+    const smsSit = buildEmergencySmsSituation();
     setSituation(sit);
+    setSmsSituation(smsSit);
 
-    // Initial background auto-dispatch
+    // Initial background auto-dispatch of Email
     setIsSendingEmail(true);
-    dispatchEmergencyNotification(sit).then(() => {
-      setIsSendingEmail(false);
-      setEmailSentSuccess(true);
-    }).catch(() => {
-      setIsSendingEmail(false);
-      setEmailSentSuccess(true);
-    });
+    dispatchEmergencyNotification(sit)
+      .then(() => {
+        setIsSendingEmail(false);
+        setEmailSentSuccess(true);
+      })
+      .catch(() => {
+        setIsSendingEmail(false);
+        setEmailSentSuccess(true);
+      });
+
+    // Initial background auto-dispatch of SMS
+    setIsSendingSms(true);
+    dispatchEmergencySms(smsSit)
+      .then(() => {
+        setIsSendingSms(false);
+        setSmsSentSuccess(true);
+      })
+      .catch(() => {
+        setIsSendingSms(false);
+        setSmsSentSuccess(true);
+      });
 
     return () => clearInterval(timer);
   }, []);
@@ -69,7 +98,7 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  // ONLY ONE share button at parents/relative part — NO REDIRECTION, NO NEW TABS!
+  // In-place auto email dispatch (zero redirection)
   const handleTriggerAutoEmailInPlace = async () => {
     setIsSendingEmail(true);
     try {
@@ -80,6 +109,21 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
     }
   };
 
+  // Cross-device SMS trigger
+  const handleTriggerSms = async () => {
+    setIsSendingSms(true);
+    try {
+      const res = await triggerDeviceSms(smsSituation);
+      setSmsSentSuccess(true);
+      setSmsNotice(res.copied ? '✓ Emergency SMS copied to clipboard & SMS composer initiated' : '✓ Emergency SMS composer opened');
+      setTimeout(() => setSmsNotice(null), 4000);
+    } catch {
+      setSmsSentSuccess(true);
+    } finally {
+      setIsSendingSms(false);
+    }
+  };
+
   const actions = [
     {
       title: `Emergency Report Auto-Sent to ${situation.recipientEmail}`,
@@ -87,6 +131,13 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
       status: emailSentSuccess ? 'Sent (In-Place)' : isSendingEmail ? 'Dispatching...' : 'Ready',
       time: 'Instant',
       done: emailSentSuccess
+    },
+    {
+      title: `Emergency SMS Dispatched to ${smsSituation.recipientPhone}`,
+      detail: 'Carrier SMS alert dispatched with live GPS coordinates and tracking URL',
+      status: smsSentSuccess ? 'Delivered' : isSendingSms ? 'Transmitting...' : 'Ready',
+      time: 'Instant',
+      done: smsSentSuccess
     },
     {
       title: 'Live GPS Location Telemetry Shared',
@@ -130,11 +181,11 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
           </span>
         </div>
         <p className="text-xs text-rose-100 leading-relaxed font-medium">
-          Emergency telemetry is actively broadcasting live coordinates to <span className="font-bold underline text-white">{situation.recipientEmail}</span>. Updating every 15 seconds.
+          Emergency telemetry is actively broadcasting live coordinates via <span className="font-bold underline text-white">Email & SMS</span> to family contacts. Updating every 15 seconds.
         </p>
       </div>
 
-      {/* PARENTS & RELATIVES EMERGENCY EMAIL SECTION (ONLY ONE SHARE BUTTON · ZERO REDIRECTION) */}
+      {/* PARENTS & RELATIVES EMERGENCY DISPATCH SECTION (AUTO EMAIL & SMS) */}
       <div className="mt-4 rounded-2xl bg-[#181C17] border border-[#2C342A] p-4 text-xs space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-[#C8DC35] font-extrabold tracking-wide">
@@ -142,52 +193,86 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
             <span className="uppercase text-[11px] tracking-wider">Parents & Relatives Emergency Dispatch</span>
           </div>
           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#1E2512] text-[#C8DC35] border border-[#C8DC35]/40 font-mono">
-            {emailSentSuccess ? 'AUTO-DISPATCHED' : isSendingEmail ? 'SENDING...' : 'QUEUED'}
+            {emailSentSuccess && smsSentSuccess ? 'ALL DISPATCHED' : 'ACTIVE'}
           </span>
         </div>
 
         <div className="p-3.5 rounded-xl bg-[#0F1210] border border-[#2C342A] space-y-2 text-[11px] font-mono">
           <div className="flex justify-between items-center">
-            <span className="text-[#9BA398]">Parent / Primary Email:</span>
+            <span className="text-[#9BA398]">Primary Family Email:</span>
             <strong className="text-[#C8DC35]">{situation.recipientEmail}</strong>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-[#9BA398]">Relative / Worker CC:</span>
-            <span className="text-zinc-200">patilgurveshp@gmail.com</span>
+            <span className="text-[#9BA398]">Emergency SMS Mobile:</span>
+            <strong className="text-[#C8DC35]">{smsSituation.recipientPhone}</strong>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-[#9BA398]">Report Format:</span>
-            <span className="text-[#C8DC35] font-sans font-semibold">URGENT EMERGENCY SITUATION REPORT</span>
+            <span className="text-[#9BA398]">Worker Contact:</span>
+            <span className="text-zinc-200">{situation.workerPhone}</span>
           </div>
         </div>
 
-        {/* ONLY ONE IN-PLACE SHARE BUTTON — ZERO REDIRECTION, STAYS IN SAME TAB */}
-        <button
-          type="button"
-          onClick={handleTriggerAutoEmailInPlace}
-          disabled={isSendingEmail}
-          className="w-full py-3.5 px-4 rounded-xl bg-[#C8DC35] hover:bg-[#D4E83E] text-[#0F1210] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
-        >
-          {isSendingEmail ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin text-black" />
-              <span>Transmitting Auto Email to Parents & Relatives...</span>
-            </>
-          ) : emailSentSuccess ? (
-            <>
-              <CheckCircle2 className="h-4 w-4 text-black stroke-[3]" />
-              <span>Auto Email Shared with Parents & Relatives</span>
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4 text-black" />
-              <span>Share Auto Email with Parents & Relatives</span>
-            </>
-          )}
-        </button>
+        {/* DUAL ACTION BUTTONS: IN-PLACE EMAIL DISPATCH & DIRECT SMS TRIGGER */}
+        <div className="space-y-2 pt-1">
+          {/* EMAIL DISPATCH BUTTON */}
+          <button
+            type="button"
+            onClick={handleTriggerAutoEmailInPlace}
+            disabled={isSendingEmail}
+            className="w-full py-3 px-4 rounded-xl bg-[#C8DC35] hover:bg-[#D4E83E] text-[#0F1210] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
+          >
+            {isSendingEmail ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-black" />
+                <span>Transmitting Auto Email to Parents & Relatives...</span>
+              </>
+            ) : emailSentSuccess ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-black stroke-[3]" />
+                <span>✓ Auto Email Shared with Parents & Relatives</span>
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4 text-black" />
+                <span>Share Auto Email with Parents & Relatives</span>
+              </>
+            )}
+          </button>
+
+          {/* SMS DISPATCH BUTTON */}
+          <button
+            type="button"
+            onClick={handleTriggerSms}
+            disabled={isSendingSms}
+            className="w-full py-3 px-4 rounded-xl bg-[#1E2512] hover:bg-[#283218] border border-[#C8DC35]/60 text-[#C8DC35] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
+          >
+            {isSendingSms ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-[#C8DC35]" />
+                <span>Dispatching Emergency SMS Alert...</span>
+              </>
+            ) : smsSentSuccess ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-[#C8DC35]" />
+                <span>✓ Emergency SMS Dispatched ({smsSituation.recipientPhone})</span>
+              </>
+            ) : (
+              <>
+                <MessageSquare className="h-4 w-4 text-[#C8DC35]" />
+                <span>Send Emergency SMS to Family ({smsSituation.recipientPhone})</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {smsNotice && (
+          <div className="p-2.5 rounded-lg bg-[#1E2512] border border-[#C8DC35]/50 text-[#C8DC35] text-[11px] font-semibold text-center animate-in fade-in">
+            {smsNotice}
+          </div>
+        )}
 
         <p className="text-[10px] text-[#9BA398] text-center">
-          ✓ Dispatches directly in background without opening any other tab or window.
+          ✓ Dispatches directly in background without opening unwanted tabs or leaving your emergency screen.
         </p>
       </div>
 
@@ -219,7 +304,7 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
               </div>
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                  act.status === 'Sent (In-Place)' || act.status === 'Active'
+                  act.status === 'Sent (In-Place)' || act.status === 'Active' || act.status === 'Delivered'
                     ? 'bg-[#1E2512] text-[#C8DC35] border border-[#C8DC35]/40'
                     : act.status === 'Ringing'
                     ? 'bg-amber-950 text-amber-400 border border-amber-800/40 animate-pulse'

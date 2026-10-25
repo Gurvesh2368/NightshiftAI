@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TripPlan } from '../engine/types';
 import { TrustChip } from '../components/TrustChip';
 import {
@@ -10,8 +10,10 @@ import {
   RefreshCw,
   PhoneCall,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Check
 } from 'lucide-react';
+import { triggerDeviceSms, buildEmergencySmsSituation } from '../lib/emergencySms';
 
 interface OfflineScreenProps {
   plan?: TripPlan | null;
@@ -24,6 +26,21 @@ export const OfflineScreen: React.FC<OfflineScreenProps> = ({
   onReconnect,
   onSendSmsSos
 }) => {
+  const [smsTriggered, setSmsTriggered] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const handleOfflineSms = async () => {
+    setSmsTriggered(true);
+    try {
+      const res = await triggerDeviceSms(buildEmergencySmsSituation());
+      setNotice(res.copied ? '✓ SMS alert copied to clipboard & SMS composer initiated' : '✓ SMS composer opened');
+      onSendSmsSos();
+      setTimeout(() => setNotice(null), 4000);
+    } catch {
+      onSendSmsSos();
+    }
+  };
+
   const offlineRows = [
     {
       title: 'Emergency Contacts',
@@ -122,13 +139,29 @@ export const OfflineScreen: React.FC<OfflineScreenProps> = ({
 
       {/* Offline SOS Trigger */}
       <div className="mt-6 space-y-3">
-        <a
-          href="sms:+919820011223?body=EMERGENCY%20NightShift%20AI%20SOS:%20I%20need%20help.%20My%20last%20known%20GPS%20location%20is:%20https://maps.google.com/?q=19.0640,72.8625"
-          className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-red-950/60 transition-all text-center"
+        <button
+          type="button"
+          onClick={handleOfflineSms}
+          className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-red-950/60 transition-all text-center cursor-pointer active:scale-[0.98]"
         >
-          <MessageSquare className="h-5 w-5" />
-          <span>Send SOS by Text Message (Offline)</span>
-        </a>
+          {smsTriggered ? (
+            <>
+              <Check className="h-5 w-5 stroke-[3]" />
+              <span>✓ Send SOS by Text Message (Offline)</span>
+            </>
+          ) : (
+            <>
+              <MessageSquare className="h-5 w-5" />
+              <span>Send SOS by Text Message (Offline)</span>
+            </>
+          )}
+        </button>
+
+        {notice && (
+          <div className="p-2.5 rounded-xl bg-red-950/80 border border-red-500/60 text-red-200 text-xs font-semibold text-center animate-in fade-in">
+            {notice}
+          </div>
+        )}
 
         <button
           onClick={onReconnect}
