@@ -47,3 +47,4 @@ describe('NightShift AI — Emergency SMS System', () => {
     expect(waUrl).toContain('text=TEST%20ALERT');
   });
 });
+

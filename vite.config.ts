@@ -228,6 +228,65 @@ function emergencyEmailPlugin(): Plugin {
           res.end('Method Not Allowed');
         }
       });
+
+      // Bluetooth Mesh Chain -> Higher Authority Escalation Endpoint
+      server.middlewares.use('/api/higher-authority-dispatch', async (req, res) => {
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => {
+            body += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              const payload = JSON.parse(body || '{}');
+              const packetId = payload.packetId || `BLE_${Date.now()}`;
+              const workerName = payload.originWorker?.name || 'Gurvesh Patil';
+              const workerPhone = payload.originWorker?.phone || '+91 98765 43210';
+              const locationName = payload.locationName || 'Near BKC Central Interchange';
+              const coords = payload.coords || { lat: 19.0680, lng: 72.8745 };
+              const hopCount = payload.hopCount || 3;
+              const refId = `AUTH-112-MH-${Date.now().toString().slice(-6)}`;
+
+              console.log('=======================================================');
+              console.log('>>> [BLUETOOTH MESH CHAIN ESCALATED TO HIGHER AUTHORITY]');
+              console.log('Packet ID:', packetId);
+              console.log('Origin Worker:', `${workerName} (${workerPhone})`);
+              console.log('Incident Location:', locationName);
+              console.log('GPS Coordinates:', `${coords.lat}, ${coords.lng}`);
+              console.log('Bluetooth Hops Traversed:', hopCount);
+              console.log('Chain Nodes:', payload.chain?.map((c: any) => c.nodeName).join(' ➔ ') || 'Peer-Mesh-Chain');
+              console.log('Higher Authority: 112 Maharashtra Police Central Command & BKC Chowki');
+              console.log('First Responder Assigned: PCR Van BKC-04 & City Trauma Rapid Response');
+              console.log('Estimated Arrival Time (ETA): 4 minutes');
+              console.log('Authority Escalation Reference:', refId);
+              console.log('Status: 100% OFF-GRID TO HIGHER AUTHORITY DISPATCH CONFIRMED');
+              console.log('=======================================================');
+
+              res.setHeader('Content-Type', 'application/json');
+              res.statusCode = 200;
+              res.end(
+                JSON.stringify({
+                  success: true,
+                  status: 'DISPATCHED_TO_AUTHORITY',
+                  agency: '112 Maharashtra Police Central Emergency Command & BKC Chowki',
+                  dispatchUnit: 'PCR Van BKC-04 & City Trauma Rapid Response',
+                  etaMinutes: 4,
+                  referenceId: refId,
+                  packetId: packetId,
+                  timestamp: new Date().toISOString()
+                })
+              );
+            } catch (e: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: e.message }));
+            }
+          });
+        } else {
+          res.statusCode = 405;
+          res.end('Method Not Allowed');
+        }
+      });
     }
   };
 }

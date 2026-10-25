@@ -14,6 +14,7 @@ import {
   Check
 } from 'lucide-react';
 import { triggerDeviceSms, buildEmergencySmsSituation } from '../lib/emergencySms';
+import { BluetoothMeshChain } from '../components/BluetoothMeshChain';
 
 interface OfflineScreenProps {
   plan?: TripPlan | null;
@@ -136,6 +137,9 @@ export const OfflineScreen: React.FC<OfflineScreenProps> = ({
           })}
         </div>
       </div>
+
+      {/* Bluetooth Mesh Relay Chain (100% Off-Grid Escalation) */}
+      <BluetoothMeshChain autoStart={true} className="mt-4" />
 
       {/* Offline SOS Trigger */}
       <div className="mt-6 space-y-3">

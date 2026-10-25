@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MOCK_AREA_ZONES } from '../data/mockScenario';
 import { TrustChip } from '../components/TrustChip';
-import { Users, Shield, AlertTriangle, EyeOff, CheckCircle2, Lock } from 'lucide-react';
+import { Users, Shield, AlertTriangle, EyeOff, CheckCircle2, Lock, Radio, Network } from 'lucide-react';
+import { BluetoothMeshChain } from '../components/BluetoothMeshChain';
 
 export const AreaScreen: React.FC = () => {
+  const [activeSubTab, setActiveSubTab] = useState<'density' | 'mesh'>('mesh');
+
   return (
     <div className="min-h-screen bg-[#18191B] text-[#ECEEF3] flex flex-col max-w-md mx-auto p-4 pb-24">
       <div className="gradient-bar w-full fixed top-0 left-0 right-0 z-10" />
@@ -11,27 +14,80 @@ export const AreaScreen: React.FC = () => {
       {/* Screen Title */}
       <div className="pt-6 pb-2">
         <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-          <Users className="h-4 w-4" />
-          <span>k-Anonymous Aggregate View</span>
+          <Network className="h-4 w-4" />
+          <span>Local Area & Mesh Relay</span>
         </div>
         <h1 className="text-2xl font-black text-[#ECEEF3] mt-1.5">
-          Night Worker Density
+          {activeSubTab === 'mesh' ? 'Bluetooth Relay Mesh' : 'Night Worker Density'}
         </h1>
         <p className="text-xs text-[#A3A8B0] mt-1 leading-relaxed">
-          Active workers 2:00–3:00 AM. Grouped counts only, never individual GPS paths.
+          {activeSubTab === 'mesh'
+            ? 'Autonomous hop-by-hop BLE emergency chain to Higher Authorities when off-grid.'
+            : 'Active workers 2:00–3:00 AM. Grouped counts only, never individual GPS paths.'}
         </p>
       </div>
 
-      {/* Privacy Guarantee Pill */}
-      <div className="p-3.5 rounded-2xl bg-[#232629] border border-zinc-800 text-xs text-zinc-300 flex items-center gap-2.5 my-3">
-        <Lock className="h-5 w-5 text-emerald-400 shrink-0" />
-        <div>
-          <strong className="text-[#ECEEF3]">Differential Privacy Guard:</strong> Any zone with fewer than 20 worker reports is strictly masked.
-        </div>
+      {/* Sub-Tab Selector */}
+      <div className="grid grid-cols-2 gap-2 my-3 p-1 rounded-2xl bg-[#232629] border border-zinc-800 text-xs font-bold">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('mesh')}
+          className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            activeSubTab === 'mesh'
+              ? 'bg-[#1E2512] text-[#C8DC35] border border-[#C8DC35]/50 shadow'
+              : 'text-[#9BA398] hover:text-white'
+          }`}
+        >
+          <Radio className="h-3.5 w-3.5" />
+          <span>Bluetooth Chain</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('density')}
+          className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            activeSubTab === 'density'
+              ? 'bg-[#1E2512] text-[#C8DC35] border border-[#C8DC35]/50 shadow'
+              : 'text-[#9BA398] hover:text-white'
+          }`}
+        >
+          <Users className="h-3.5 w-3.5" />
+          <span>Worker Density</span>
+        </button>
       </div>
 
-      {/* Zone Cards Grid */}
-      <div className="space-y-3 mt-1">
+      {activeSubTab === 'mesh' ? (
+        <div className="space-y-4">
+          <BluetoothMeshChain autoStart={false} />
+
+          <div className="rounded-2xl bg-[#232629] p-4 border border-zinc-800 space-y-2.5 text-xs text-zinc-300">
+            <div className="font-extrabold text-[#C8DC35] uppercase text-[11px] tracking-wide flex items-center gap-1.5">
+              <Shield className="h-4 w-4" />
+              <span>How the Offline Chain Escalates</span>
+            </div>
+            <p className="text-[11px] text-[#A3A8B0] leading-relaxed">
+              1. <strong>Zero Internet Broadcast:</strong> If you trigger SOS with no cellular or Wi-Fi, your phone emits an encrypted 2.4 GHz BLE radio packet.
+            </p>
+            <p className="text-[11px] text-[#A3A8B0] leading-relaxed">
+              2. <strong>Peer-to-Peer Hopping:</strong> Nearby night workers, delivery bikes, or BEST transit buses detect the packet, verify hop signatures, and relay it along the corridor.
+            </p>
+            <p className="text-[11px] text-[#A3A8B0] leading-relaxed">
+              3. <strong>Higher Authority Dispatch:</strong> Once the packet reaches a Police Chowki beacon, transit hub terminal, or an online peer, it automatically dispatches first responders via 112 National Police Command.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Privacy Guarantee Pill */}
+          <div className="p-3.5 rounded-2xl bg-[#232629] border border-zinc-800 text-xs text-zinc-300 flex items-center gap-2.5 my-3">
+            <Lock className="h-5 w-5 text-emerald-400 shrink-0" />
+            <div>
+              <strong className="text-[#ECEEF3]">Differential Privacy Guard:</strong> Any zone with fewer than 20 worker reports is strictly masked.
+            </div>
+          </div>
+
+          {/* Zone Cards Grid */}
+          <div className="space-y-3 mt-1">
         {MOCK_AREA_ZONES.map((zone, idx) => {
           if (zone.hidden) {
             return (
@@ -114,6 +170,8 @@ export const AreaScreen: React.FC = () => {
       <div className="text-center text-[11px] text-[#A3A8B0] mt-6 pt-4 border-t border-zinc-800 leading-relaxed">
         Aggregated via <code className="text-emerald-400">area_zones()</code> Postgres RPC with SECURITY DEFINER · Sample 180 check-ins · Never links individual identities
       </div>
+        </>
+      )}
     </div>
   );
 };

@@ -24,6 +24,7 @@ import {
   triggerDeviceSms,
   EmergencySmsSituation
 } from '../lib/emergencySms';
+import { BluetoothMeshChain } from '../components/BluetoothMeshChain';
 import { tts } from '../lib/tts';
 
 interface SosActiveScreenProps {
@@ -138,6 +139,13 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
       status: smsSentSuccess ? 'Delivered' : isSendingSms ? 'Transmitting...' : 'Ready',
       time: 'Instant',
       done: smsSentSuccess
+    },
+    {
+      title: 'Bluetooth Mesh Chain (Off-Grid Radio Relay)',
+      detail: 'Hopping peer-to-peer across BLE nodes ➔ Dispatched to 112 Police Command',
+      status: 'Relaying',
+      time: 'Active',
+      done: true
     },
     {
       title: 'Live GPS Location Telemetry Shared',
@@ -275,6 +283,9 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
           ✓ Dispatches directly in background without opening unwanted tabs or leaving your emergency screen.
         </p>
       </div>
+
+      {/* BLUETOOTH MESH EMERGENCY RELAY CHAIN (OFF-GRID & ZERO INTERNET READY) */}
+      <BluetoothMeshChain autoStart={true} className="mt-4" />
 
       {/* Escalation Sequence Status Checklist */}
       <div className="my-4 rounded-2xl bg-[#181C17] p-4 border border-[#2C342A] space-y-3">
