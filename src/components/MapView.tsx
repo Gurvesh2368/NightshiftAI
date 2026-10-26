@@ -14,7 +14,7 @@ export interface AlternateRoute {
 }
 
 export interface MapViewProps {
-  routeCoordinates?: [number, number][]; // [[lng, lat], ...] (Active route)
+  routeCoordinates?: [number, number][]; // [[lng, lat], ...] (Preferred active route)
   alternateRoutes?: AlternateRoute[]; // 3 distinct routes
   selectedRouteMode?: 'safest' | 'fastest' | 'cheapest';
   onSelectRouteMode?: (mode: 'safest' | 'fastest' | 'cheapest') => void;
@@ -44,7 +44,7 @@ export const MapView: React.FC<MapViewProps> = ({
   zoom = 14,
   center,
   interactive = true,
-  startLabel = 'START',
+  startLabel = 'LIVE START',
   endLabel = 'FINAL DESTINATION',
   fitBoundsOnRoute = true
 }) => {
@@ -52,6 +52,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
   const startMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const preferredBadgeRef = useRef<maplibregl.Marker | null>(null);
   const endMarkerRef = useRef<maplibregl.Marker | null>(null);
   const placeMarkersRef = useRef<maplibregl.Marker[]>([]);
   const [mapTheme, setMapTheme] = useState<'spinal' | 'osm'>('spinal');
@@ -126,7 +127,7 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
-  // Synchronizes the 3 routes from the live location to the same final destination
+  // Synchronizes the preferred route and alternate routes connecting Start to End
   const syncRouteToMap = () => {
     const map = mapRef.current;
     if (!map) return;
@@ -136,13 +137,61 @@ export const MapView: React.FC<MapViewProps> = ({
       return;
     }
 
-    // 1. Clean up old alternate layers & sources
-    for (let i = 0; i < 6; i++) {
-      if (map.getLayer(`route-alt-${i}`)) map.removeLayer(`route-alt-${i}`);
-      if (map.getSource(`route-alt-${i}`)) map.removeSource(`route-alt-${i}`);
+    // 1. Clean up ALL previous route layers and sources
+    const allLayerIds = [
+      'route-preferred-inner',
+      'route-preferred-line',
+      'route-preferred-glow',
+      'route-preferred-casing',
+      'route-line',
+      'route-glow',
+      'route-alt-line-0',
+      'route-alt-casing-0',
+      'route-alt-line-1',
+      'route-alt-casing-1',
+      'route-alt-line-2',
+      'route-alt-casing-2',
+      'route-alt-0',
+      'route-alt-1',
+      'route-alt-2'
+    ];
+    allLayerIds.forEach(id => {
+      try {
+        if (map.getLayer(id)) map.removeLayer(id);
+      } catch (_) {}
+    });
+
+    const allSourceIds = [
+      'route-preferred',
+      'route-corridor',
+      'route-alt-0',
+      'route-alt-1',
+      'route-alt-2'
+    ];
+    allSourceIds.forEach(id => {
+      try {
+        if (map.getSource(id)) map.removeSource(id);
+      } catch (_) {}
+    });
+
+    // Clean markers if no valid coordinates
+    if (!routeCoordinates || routeCoordinates.length < 2) {
+      if (startMarkerRef.current) {
+        startMarkerRef.current.remove();
+        startMarkerRef.current = null;
+      }
+      if (preferredBadgeRef.current) {
+        preferredBadgeRef.current.remove();
+        preferredBadgeRef.current = null;
+      }
+      if (endMarkerRef.current) {
+        endMarkerRef.current.remove();
+        endMarkerRef.current = null;
+      }
+      return;
     }
 
-    // 2. Render Inactive Alternate Routes
+    // 2. Render Inactive Alternate Routes (at bottom of route stack)
     const activeMode = selectedRouteMode || 'safest';
     const otherRoutes = (alternateRoutes || []).filter(
       r => r.coordinates && r.coordinates.length > 1 && r.mode !== activeMode
@@ -153,22 +202,37 @@ export const MapView: React.FC<MapViewProps> = ({
       const color =
         alt.mode === 'cheapest' ? '#38bdf8' : alt.mode === 'fastest' ? '#fbbf24' : '#34d399';
 
-      const altGeoJson = {
-        type: 'Feature' as const,
-        properties: { mode: alt.mode, label: alt.label },
-        geometry: {
-          type: 'LineString' as const,
-          coordinates: alt.coordinates
-        }
-      };
-
       map.addSource(sourceId, {
         type: 'geojson',
-        data: altGeoJson
+        data: {
+          type: 'Feature' as const,
+          properties: { mode: alt.mode, label: alt.label },
+          geometry: {
+            type: 'LineString' as const,
+            coordinates: alt.coordinates
+          }
+        }
       });
 
+      // Subtle dark casing for alternate route
       map.addLayer({
-        id: sourceId,
+        id: `route-alt-casing-${idx}`,
+        type: 'line',
+        source: sourceId,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#050705',
+          'line-width': 6,
+          'line-opacity': 0.6
+        }
+      });
+
+      // Alternate route line (dashed)
+      map.addLayer({
+        id: `route-alt-line-${idx}`,
         type: 'line',
         source: sourceId,
         layout: {
@@ -177,92 +241,99 @@ export const MapView: React.FC<MapViewProps> = ({
         },
         paint: {
           'line-color': color,
-          'line-width': 4.5,
-          'line-opacity': 0.7,
+          'line-width': 4,
+          'line-opacity': 0.75,
           'line-dasharray': [3, 2]
         }
       });
     });
 
-    // 3. Render Active Selected Route
-    if (!routeCoordinates || routeCoordinates.length < 2) {
-      if (map.getLayer('route-line')) map.removeLayer('route-line');
-      if (map.getLayer('route-glow')) map.removeLayer('route-glow');
-      if (map.getSource('route-corridor')) map.removeSource('route-corridor');
-      if (startMarkerRef.current) {
-        startMarkerRef.current.remove();
-        startMarkerRef.current = null;
-      }
-      if (endMarkerRef.current) {
-        endMarkerRef.current.remove();
-        endMarkerRef.current = null;
-      }
-      return;
-    }
-
-    const routeGeoJson = {
-      type: 'Feature' as const,
-      properties: {},
-      geometry: {
-        type: 'LineString' as const,
-        coordinates: routeCoordinates
-      }
-    };
-
-    const source = map.getSource('route-corridor') as maplibregl.GeoJSONSource | undefined;
-    if (source) {
-      source.setData(routeGeoJson);
-    } else {
-      map.addSource('route-corridor', {
-        type: 'geojson',
-        data: routeGeoJson
-      });
-    }
-
-    // Outer illuminated neon glow layer for active corridor
-    if (!map.getLayer('route-glow')) {
-      map.addLayer({
-        id: 'route-glow',
-        type: 'line',
-        source: 'route-corridor',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#15803d',
-          'line-width': 14,
-          'line-opacity': 0.85
+    // 3. Render PREFERRED ROUTE (Prominently on top with 4 visual tiers)
+    map.addSource('route-preferred', {
+      type: 'geojson',
+      data: {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: routeCoordinates
         }
-      });
-    }
+      }
+    });
 
-    // Core crisp tactical corridor route line
-    if (!map.getLayer('route-line')) {
-      map.addLayer({
-        id: 'route-line',
-        type: 'line',
-        source: 'route-corridor',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#C8DC35',
-          'line-width': 6,
-          'line-opacity': 1.0
-        }
-      });
-    }
+    // Tier 1: Bold Dark Casing (Guarantees contrast on ANY map background)
+    map.addLayer({
+      id: 'route-preferred-casing',
+      type: 'line',
+      source: 'route-preferred',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#050705',
+        'line-width': 11,
+        'line-opacity': 0.95
+      }
+    });
 
-    // Visual START Marker (User Live Location)
+    // Tier 2: Illuminated Emerald Neon Glow
+    map.addLayer({
+      id: 'route-preferred-glow',
+      type: 'line',
+      source: 'route-preferred',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#15803d',
+        'line-width': 18,
+        'line-opacity': 0.85
+      }
+    });
+
+    // Tier 3: Core Tactical Corridor Line (#C8DC35 Bright Lime)
+    map.addLayer({
+      id: 'route-preferred-line',
+      type: 'line',
+      source: 'route-preferred',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#C8DC35',
+        'line-width': 7,
+        'line-opacity': 1.0
+      }
+    });
+
+    // Tier 4: White Inner Centerline (Directional Flow)
+    map.addLayer({
+      id: 'route-preferred-inner',
+      type: 'line',
+      source: 'route-preferred',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#ffffff',
+        'line-width': 2.5,
+        'line-opacity': 0.9,
+        'line-dasharray': [2, 3]
+      }
+    });
+
+    // 4. START Marker (Live Location Anchor)
     const startCoord = routeCoordinates[0];
     if (startCoord) {
       if (!startMarkerRef.current) {
         const startEl = document.createElement('div');
         startEl.className = 'route-start-marker flex flex-col items-center cursor-pointer pointer-events-auto';
         startEl.innerHTML = `
-          <div style="background-color: #C8DC35; color: #0F1210; font-weight: 900; font-size: 10px; padding: 2px 7px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); border: 2px solid #ffffff; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; font-family: ui-monospace, monospace;">
+          <div style="background-color: #C8DC35; color: #0F1210; font-weight: 900; font-size: 10px; padding: 2px 8px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); border: 2px solid #ffffff; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; font-family: ui-monospace, monospace;">
             <span style="display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background-color: #0F1210;"></span>
             ${startLabel}
           </div>
@@ -270,27 +341,48 @@ export const MapView: React.FC<MapViewProps> = ({
         `;
         startMarkerRef.current = new maplibregl.Marker({ element: startEl, anchor: 'bottom' })
           .setLngLat(startCoord)
-          .setPopup(
-            new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(`
-              <div style="color: #18191B; padding: 4px 8px; font-family: sans-serif; font-size: 11px; font-weight: bold;">
-                🟢 Live Start Location: [${startCoord[1].toFixed(4)}, ${startCoord[0].toFixed(4)}]
-              </div>
-            `)
-          )
           .addTo(map);
       } else {
         startMarkerRef.current.setLngLat(startCoord);
       }
     }
 
-    // Visual FINAL DESTINATION Marker (Single destination point for all 3 routes)
+    // 5. PREFERRED ROUTE Midway Badge (Placed directly on the route line)
+    const midIdx = Math.floor(routeCoordinates.length / 2);
+    const midCoord = routeCoordinates[midIdx] || startCoord;
+    if (midCoord) {
+      const modeLabel = activeMode === 'safest' ? 'SAFEST CORRIDOR' : activeMode === 'fastest' ? 'FASTEST DIRECT' : 'TRANSIT BUS';
+      if (!preferredBadgeRef.current) {
+        const midEl = document.createElement('div');
+        midEl.className = 'preferred-route-badge pointer-events-none';
+        midEl.innerHTML = `
+          <div style="background-color: #0F1210; color: #C8DC35; border: 1.5px solid #C8DC35; font-weight: 900; font-size: 9px; padding: 2px 8px; border-radius: 9999px; box-shadow: 0 4px 14px rgba(0,0,0,0.8); letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; font-family: ui-monospace, monospace; text-transform: uppercase;">
+            <span style="color: #C8DC35;">★</span>
+            <span>PREFERRED ROUTE (${modeLabel})</span>
+          </div>
+        `;
+        preferredBadgeRef.current = new maplibregl.Marker({ element: midEl, anchor: 'center' })
+          .setLngLat(midCoord)
+          .addTo(map);
+      } else {
+        preferredBadgeRef.current.setLngLat(midCoord);
+        preferredBadgeRef.current.getElement().innerHTML = `
+          <div style="background-color: #0F1210; color: #C8DC35; border: 1.5px solid #C8DC35; font-weight: 900; font-size: 9px; padding: 2px 8px; border-radius: 9999px; box-shadow: 0 4px 14px rgba(0,0,0,0.8); letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; font-family: ui-monospace, monospace; text-transform: uppercase;">
+            <span style="color: #C8DC35;">★</span>
+            <span>PREFERRED ROUTE (${modeLabel})</span>
+          </div>
+        `;
+      }
+    }
+
+    // 6. FINAL DESTINATION Marker (Single Destination Anchor for all routes)
     const endCoord = routeCoordinates[routeCoordinates.length - 1];
     if (endCoord) {
       if (!endMarkerRef.current) {
         const endEl = document.createElement('div');
         endEl.className = 'route-end-marker flex flex-col items-center cursor-pointer pointer-events-auto';
         endEl.innerHTML = `
-          <div style="background-color: #ef4444; color: #ffffff; font-weight: 900; font-size: 10px; padding: 2px 7px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); border: 2px solid #ffffff; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; font-family: ui-monospace, monospace;">
+          <div style="background-color: #ef4444; color: #ffffff; font-weight: 900; font-size: 10px; padding: 2px 8px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); border: 2px solid #ffffff; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; font-family: ui-monospace, monospace;">
             <span>🏁</span>
             ${endLabel}
           </div>
@@ -298,20 +390,13 @@ export const MapView: React.FC<MapViewProps> = ({
         `;
         endMarkerRef.current = new maplibregl.Marker({ element: endEl, anchor: 'bottom' })
           .setLngLat(endCoord)
-          .setPopup(
-            new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(`
-              <div style="color: #18191B; padding: 4px 8px; font-family: sans-serif; font-size: 11px; font-weight: bold;">
-                🏁 Final Destination: [${endCoord[1].toFixed(4)}, ${endCoord[0].toFixed(4)}]
-              </div>
-            `)
-          )
           .addTo(map);
       } else {
         endMarkerRef.current.setLngLat(endCoord);
       }
     }
 
-    // Auto-fit camera bounds to encompass the complete network of all 3 routes
+    // 7. Auto-fit camera bounds to encompass the complete network of all 3 routes
     if (fitBoundsOnRoute) {
       try {
         const bounds = new maplibregl.LngLatBounds();
@@ -399,6 +484,10 @@ export const MapView: React.FC<MapViewProps> = ({
       if (startMarkerRef.current) {
         startMarkerRef.current.remove();
         startMarkerRef.current = null;
+      }
+      if (preferredBadgeRef.current) {
+        preferredBadgeRef.current.remove();
+        preferredBadgeRef.current = null;
       }
       if (endMarkerRef.current) {
         endMarkerRef.current.remove();

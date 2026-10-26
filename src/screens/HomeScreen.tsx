@@ -238,12 +238,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <div className="flex items-center justify-between pb-1">
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#F4F6F2]">
               <Compass className="h-4 w-4 text-[#C8DC35]" />
-              <span>3 Corridors to Same Destination</span>
+              <span>Preferred Route Corridor</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] font-mono text-[#C8DC35] bg-[#0F1210] px-2 py-0.5 rounded border border-[#2C342A]">
-              <span>3 Options</span>
+              <span>★ {selectedMode.toUpperCase()} PREFERRED</span>
               <span>·</span>
-              <span className="capitalize">{selectedMode} Active</span>
+              <span>{currentPlan.etaP50Min} min</span>
             </div>
           </div>
 
@@ -284,13 +284,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   onClick={() => onSelectMode(p.mode)}
                   className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-[#252B23] border-[#C8DC35] text-white shadow-md'
+                      ? 'bg-[#252B23] border-[#C8DC35] text-white shadow-md ring-1 ring-[#C8DC35]'
                       : 'bg-[#121512] border-[#2C342A] text-zinc-400 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <span className={`w-2 h-2 rounded-full ${colorDot} shrink-0`}></span>
-                    <span className="capitalize truncate text-[11px] text-[#F4F6F2]">{p.mode}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <span className={`w-2 h-2 rounded-full ${colorDot} shrink-0`}></span>
+                      <span className="capitalize truncate text-[11px] text-[#F4F6F2]">{p.mode}</span>
+                    </div>
+                    {isSelected && (
+                      <span className="text-[8px] font-black text-[#C8DC35] uppercase bg-[#C8DC35]/20 px-1 py-0.5 rounded">
+                        Active
+                      </span>
+                    )}
                   </div>
                   <div className="text-[9px] text-[#9BA398] mt-0.5 truncate">
                     {p.etaP50Min}m · {p.mode === 'safest' ? `Score ${p.safetyScore}` : p.mode === 'cheapest' ? `₹${p.fareInr}` : 'Direct'}
