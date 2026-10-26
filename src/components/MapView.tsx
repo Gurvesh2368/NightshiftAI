@@ -3,8 +3,21 @@ import * as maplibregl from 'maplibre-gl';
 import { OfflinePlace } from '../lib/db';
 import { getStoredCoords } from '../lib/geo';
 
-interface MapViewProps {
-  routeCoordinates?: [number, number][]; // [[lng, lat], ...]
+export interface AlternateRoute {
+  id: string;
+  mode: 'safest' | 'fastest' | 'cheapest';
+  coordinates: [number, number][];
+  label?: string;
+  distanceKm?: number;
+  durationMin?: number;
+  safetyScore?: number;
+}
+
+export interface MapViewProps {
+  routeCoordinates?: [number, number][]; // [[lng, lat], ...] (Active route)
+  alternateRoutes?: AlternateRoute[]; // 3 distinct routes
+  selectedRouteMode?: 'safest' | 'fastest' | 'cheapest';
+  onSelectRouteMode?: (mode: 'safest' | 'fastest' | 'cheapest') => void;
   currentPosition?: [number, number] | null; // [lng, lat]
   places?: OfflinePlace[];
   onSelectPlace?: (place: OfflinePlace) => void;
@@ -21,6 +34,9 @@ const MAP_API_KEY = import.meta.env.VITE_MAP_API_KEY || 'd66cc14691a444479868628
 
 export const MapView: React.FC<MapViewProps> = ({
   routeCoordinates,
+  alternateRoutes,
+  selectedRouteMode = 'safest',
+  onSelectRouteMode,
   currentPosition,
   places = [],
   onSelectPlace,
@@ -29,7 +45,7 @@ export const MapView: React.FC<MapViewProps> = ({
   center,
   interactive = true,
   startLabel = 'START',
-  endLabel = 'DESTINATION',
+  endLabel = 'FINAL DESTINATION',
   fitBoundsOnRoute = true
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -110,7 +126,7 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
-  // Synchronizes route corridor polylines, start/end beacons, and camera framing
+  // Synchronizes the 3 routes from the live location to the same final destination
   const syncRouteToMap = () => {
     const map = mapRef.current;
     if (!map) return;
@@ -120,7 +136,55 @@ export const MapView: React.FC<MapViewProps> = ({
       return;
     }
 
-    // Clean up if route is empty or invalid
+    // 1. Clean up old alternate layers & sources
+    for (let i = 0; i < 6; i++) {
+      if (map.getLayer(`route-alt-${i}`)) map.removeLayer(`route-alt-${i}`);
+      if (map.getSource(`route-alt-${i}`)) map.removeSource(`route-alt-${i}`);
+    }
+
+    // 2. Render Inactive Alternate Routes
+    const activeMode = selectedRouteMode || 'safest';
+    const otherRoutes = (alternateRoutes || []).filter(
+      r => r.coordinates && r.coordinates.length > 1 && r.mode !== activeMode
+    );
+
+    otherRoutes.forEach((alt, idx) => {
+      const sourceId = `route-alt-${idx}`;
+      const color =
+        alt.mode === 'cheapest' ? '#38bdf8' : alt.mode === 'fastest' ? '#fbbf24' : '#34d399';
+
+      const altGeoJson = {
+        type: 'Feature' as const,
+        properties: { mode: alt.mode, label: alt.label },
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: alt.coordinates
+        }
+      };
+
+      map.addSource(sourceId, {
+        type: 'geojson',
+        data: altGeoJson
+      });
+
+      map.addLayer({
+        id: sourceId,
+        type: 'line',
+        source: sourceId,
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': color,
+          'line-width': 4.5,
+          'line-opacity': 0.7,
+          'line-dasharray': [3, 2]
+        }
+      });
+    });
+
+    // 3. Render Active Selected Route
     if (!routeCoordinates || routeCoordinates.length < 2) {
       if (map.getLayer('route-line')) map.removeLayer('route-line');
       if (map.getLayer('route-glow')) map.removeLayer('route-glow');
@@ -155,7 +219,7 @@ export const MapView: React.FC<MapViewProps> = ({
       });
     }
 
-    // Outer illuminated neon glow layer
+    // Outer illuminated neon glow layer for active corridor
     if (!map.getLayer('route-glow')) {
       map.addLayer({
         id: 'route-glow',
@@ -168,7 +232,7 @@ export const MapView: React.FC<MapViewProps> = ({
         paint: {
           'line-color': '#15803d',
           'line-width': 14,
-          'line-opacity': 0.8
+          'line-opacity': 0.85
         }
       });
     }
@@ -191,7 +255,7 @@ export const MapView: React.FC<MapViewProps> = ({
       });
     }
 
-    // Visual START Marker (Origin Point)
+    // Visual START Marker (User Live Location)
     const startCoord = routeCoordinates[0];
     if (startCoord) {
       if (!startMarkerRef.current) {
@@ -209,7 +273,7 @@ export const MapView: React.FC<MapViewProps> = ({
           .setPopup(
             new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(`
               <div style="color: #18191B; padding: 4px 8px; font-family: sans-serif; font-size: 11px; font-weight: bold;">
-                🟢 Start: [${startCoord[1].toFixed(4)}, ${startCoord[0].toFixed(4)}]
+                🟢 Live Start Location: [${startCoord[1].toFixed(4)}, ${startCoord[0].toFixed(4)}]
               </div>
             `)
           )
@@ -219,7 +283,7 @@ export const MapView: React.FC<MapViewProps> = ({
       }
     }
 
-    // Visual END Marker (Destination Point)
+    // Visual FINAL DESTINATION Marker (Single destination point for all 3 routes)
     const endCoord = routeCoordinates[routeCoordinates.length - 1];
     if (endCoord) {
       if (!endMarkerRef.current) {
@@ -237,7 +301,7 @@ export const MapView: React.FC<MapViewProps> = ({
           .setPopup(
             new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(`
               <div style="color: #18191B; padding: 4px 8px; font-family: sans-serif; font-size: 11px; font-weight: bold;">
-                🏁 Destination: [${endCoord[1].toFixed(4)}, ${endCoord[0].toFixed(4)}]
+                🏁 Final Destination: [${endCoord[1].toFixed(4)}, ${endCoord[0].toFixed(4)}]
               </div>
             `)
           )
@@ -247,11 +311,14 @@ export const MapView: React.FC<MapViewProps> = ({
       }
     }
 
-    // Automatic camera fitting to encompass the starting to ending corridor
+    // Auto-fit camera bounds to encompass the complete network of all 3 routes
     if (fitBoundsOnRoute) {
       try {
         const bounds = new maplibregl.LngLatBounds();
         routeCoordinates.forEach(coord => bounds.extend(coord as [number, number]));
+        (alternateRoutes || []).forEach(alt => {
+          alt.coordinates?.forEach(coord => bounds.extend(coord as [number, number]));
+        });
         map.fitBounds(bounds, {
           padding: { top: 55, bottom: 55, left: 50, right: 50 },
           maxZoom: 16,
@@ -367,7 +434,7 @@ export const MapView: React.FC<MapViewProps> = ({
   // Sync route coordinates, start beacon, and end beacon
   useEffect(() => {
     syncRouteToMap();
-  }, [routeCoordinates, startLabel, endLabel, fitBoundsOnRoute]);
+  }, [routeCoordinates, alternateRoutes, selectedRouteMode, startLabel, endLabel, fitBoundsOnRoute]);
 
   // Update Live User GPS Marker (Pulsing Blue Dot)
   useEffect(() => {
@@ -495,6 +562,32 @@ export const MapView: React.FC<MapViewProps> = ({
           OSM
         </button>
       </div>
+
+      {/* 3 Different Routes Switcher Pills */}
+      {alternateRoutes && alternateRoutes.length > 1 && onSelectRouteMode && (
+        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1 bg-black/90 backdrop-blur-md border border-zinc-700/80 rounded-xl p-1 text-[10px] font-mono shadow-2xl">
+          {alternateRoutes.map(alt => {
+            const isSelected = alt.mode === (selectedRouteMode || 'safest');
+            const icon = alt.mode === 'safest' ? '🛡️' : alt.mode === 'fastest' ? '⚡' : '🚌';
+            const label = alt.mode === 'safest' ? 'Safest' : alt.mode === 'fastest' ? 'Fastest' : 'Transit';
+            return (
+              <button
+                key={alt.id || alt.mode}
+                onClick={() => onSelectRouteMode(alt.mode)}
+                className={`px-2 py-0.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#C8DC35] text-[#0F1210] font-black shadow-md'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                }`}
+                title={`Switch to ${alt.label || label}`}
+              >
+                <span>{icon}</span>
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

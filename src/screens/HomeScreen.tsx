@@ -77,7 +77,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setUserCoords(updated);
       });
 
-      // Calculate real route from live GPS position to Home Safe Hub
+      // Calculate 3 real routes from live GPS position to Home Safe Hub
       try {
         const defaultDest = {
           lat: coords.lat + 0.009,
@@ -199,7 +199,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {isCalculatingRoute && (
         <div className="p-3 rounded-2xl bg-[#1E2512] border border-[#C8DC35]/50 text-[#C8DC35] text-xs font-bold flex items-center justify-center gap-2 my-2 animate-pulse">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Calculating Real Safety Road Routes to {selectedDestName}...</span>
+          <span>Calculating 3 Real Road Corridors from Live GPS to {selectedDestName}...</span>
         </div>
       )}
 
@@ -232,42 +232,85 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         />
       )}
 
-      {/* Active Starting-to-Ending Route Corridor Map Preview */}
+      {/* 3 Routes Starting-to-Ending Corridor Map Preview */}
       {currentPlan?.polyline && currentPlan.polyline.length > 1 && (
         <div className="my-3 rounded-3xl overflow-hidden border border-[#2C342A] bg-[#181C17] p-3 space-y-2 shadow-xl">
           <div className="flex items-center justify-between pb-1">
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#F4F6F2]">
               <Compass className="h-4 w-4 text-[#C8DC35]" />
-              <span>Route Corridor Preview</span>
+              <span>3 Corridors to Same Destination</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] font-mono text-[#C8DC35] bg-[#0F1210] px-2 py-0.5 rounded border border-[#2C342A]">
-              <span>{currentPlan.polyline.length} Waypoints</span>
+              <span>3 Options</span>
               <span>·</span>
-              <span>{currentPlan.etaP50Min} min</span>
+              <span className="capitalize">{selectedMode} Active</span>
             </div>
           </div>
 
           <MapView
-            className="h-56 w-full"
+            className="h-60 w-full"
             routeCoordinates={currentPlan.polyline}
+            alternateRoutes={plans.map(p => ({
+              id: p.id,
+              mode: p.mode,
+              coordinates: p.polyline || [],
+              label: p.name,
+              distanceKm: p.legs[0]?.distanceKm,
+              durationMin: p.etaP50Min,
+              safetyScore: p.safetyScore
+            }))}
+            selectedRouteMode={selectedMode}
+            onSelectRouteMode={mode => onSelectMode(mode)}
             currentPosition={[userCoords.lng, userCoords.lat]}
             center={[userCoords.lng, userCoords.lat]}
-            startLabel="START"
-            endLabel="DESTINATION"
+            startLabel="LIVE START"
+            endLabel="FINAL DESTINATION"
             fitBoundsOnRoute={true}
           />
 
-          <div className="flex items-center justify-between text-[11px] font-mono text-[#9BA398] pt-1 px-1">
+          {/* 3 Route Options Selectors */}
+          <div className="grid grid-cols-3 gap-1.5 pt-1 text-[10px] font-mono">
+            {plans.map(p => {
+              const isSelected = p.mode === selectedMode;
+              const colorDot =
+                p.mode === 'safest'
+                  ? 'bg-[#C8DC35]'
+                  : p.mode === 'fastest'
+                  ? 'bg-[#fbbf24]'
+                  : 'bg-[#38bdf8]';
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onSelectMode(p.mode)}
+                  className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#252B23] border-[#C8DC35] text-white shadow-md'
+                      : 'bg-[#121512] border-[#2C342A] text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span className={`w-2 h-2 rounded-full ${colorDot} shrink-0`}></span>
+                    <span className="capitalize truncate text-[11px] text-[#F4F6F2]">{p.mode}</span>
+                  </div>
+                  <div className="text-[9px] text-[#9BA398] mt-0.5 truncate">
+                    {p.etaP50Min}m · {p.mode === 'safest' ? `Score ${p.safetyScore}` : p.mode === 'cheapest' ? `₹${p.fareInr}` : 'Direct'}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] font-mono text-[#9BA398] pt-1 px-1 border-t border-[#2C342A]/60">
             <div className="flex items-center gap-1.5 truncate max-w-[45%]">
               <span className="w-2.5 h-2.5 rounded-full bg-[#C8DC35] shrink-0 inline-block"></span>
               <span className="text-[#F4F6F2] font-semibold truncate">
-                {currentPlan.legs[0]?.fromName || 'Start Position'}
+                {currentAddress || 'Live GPS Location'}
               </span>
             </div>
             <ArrowRight className="h-3.5 w-3.5 text-[#C8DC35] shrink-0" />
             <div className="flex items-center gap-1.5 truncate max-w-[45%] justify-end">
               <span className="text-[#F4F6F2] font-semibold truncate">
-                {currentPlan.legs[currentPlan.legs.length - 1]?.toName || selectedDestName}
+                {selectedDestName}
               </span>
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 inline-block"></span>
             </div>

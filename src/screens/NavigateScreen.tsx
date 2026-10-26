@@ -237,8 +237,8 @@ export const NavigateScreen: React.FC<NavigateScreenProps> = ({
           currentPosition={currentCoords}
           center={currentCoords}
           zoom={16}
-          startLabel="START"
-          endLabel="DESTINATION"
+          startLabel="LIVE START"
+          endLabel="FINAL DESTINATION"
           fitBoundsOnRoute={fitRouteOverview}
         />
 
