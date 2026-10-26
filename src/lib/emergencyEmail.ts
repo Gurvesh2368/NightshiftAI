@@ -8,6 +8,23 @@ export const HIGH_PRIORITY_EMAIL_HEADERS: Record<string, string> = {
   'Priority': 'urgent'
 };
 
+/**
+ * Hardcoded SOS Disaster Message automatically included in all emergency alerts
+ */
+export const HARDCODED_SOS_MESSAGE = `🚨 CRITICAL SOS DISASTER BROADCAST: Immediate evacuation alert activated. The worker is in an active danger zone and urgently requires emergency assistance and monitoring. Please review the live GPS coordinates, follow immediate safety protocols, and notify emergency responders at 112 if unreachable.`;
+
+/**
+ * Triggers subtle haptic vibration feedback on supported mobile devices
+ */
+export function triggerHapticFeedback(pattern: number[] = [100, 50, 100]): boolean {
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      return navigator.vibrate(pattern);
+    }
+  } catch (_) {}
+  return false;
+}
+
 export interface EmergencySituation {
   workerName: string;
   workerPhone: string;
@@ -127,6 +144,8 @@ export function formatEmergencyEmail(sit: EmergencySituation) {
 HAZARD TYPE: ${sit.hazardType || 'CRITICAL IMMINENT THREAT / SEVERE NIGHT DISASTER'}
 INCIDENT STATUS: ACTIVE CRITICAL TELEMETRY BROADCAST
 
+${HARDCODED_SOS_MESSAGE}
+
 AFFECTED USER & CONTACT
 --------------------------------------------------
 • Affected User: ${sit.workerName}
@@ -188,119 +207,153 @@ Emergency Dispatch: tel:112`;
   return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
 }
 
-/**
- * Uses the default system & browser API (navigator.share / background mailto)
- * to transmit the exact relevant emergency disaster alert with zero third-party form activation.
- */
-export async function dispatchDefaultApiEmail(sit: EmergencySituation): Promise<{ success: boolean; method: string }> {
-  const { subject, body } = formatEmergencyEmail(sit);
-
-  // 1. Try default Web Share API (native mobile/desktop sharing sheet)
-  if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
-    try {
-      await (navigator as any).share({
-        title: subject,
-        text: body,
-        url: sit.trackingUrl
-      });
-      return { success: true, method: 'navigator.share' };
-    } catch (_) {}
-  }
-
-  // 2. Default System Mail Client API (mailto: URI protocol in hidden link)
-  if (typeof window !== 'undefined') {
-    try {
-      const mailtoUrl = getMailtoUrl(sit);
-      const hiddenLink = document.createElement('a');
-      hiddenLink.href = mailtoUrl;
-      hiddenLink.target = '_blank';
-      hiddenLink.rel = 'noopener noreferrer';
-      hiddenLink.style.display = 'none';
-      document.body.appendChild(hiddenLink);
-      hiddenLink.click();
-      setTimeout(() => {
-        try { document.body.removeChild(hiddenLink); } catch {}
-      }, 2000);
-      return { success: true, method: 'mailto' };
-    } catch (_) {}
-  }
-
-  return { success: true, method: 'api' };
+export interface DirectApiDispatchResult {
+  success: boolean;
+  status: string;
+  message: string;
+  recipient: string;
+  familyEmail: string;
+  messageId?: string;
+  previewUrl?: string;
+  timestamp: string;
+  attempts?: number;
 }
 
 /**
- * Directly dispatches the Emergency Disaster Alert in the background
- * targeting the affected user's email address with high-priority headers.
+ * Completely silent direct API dispatcher with background error handling & automatic retry.
+ * Replaces OS-level intents (mailto:) with direct backend HTTP API / SMTP call.
+ * Automatically pulls predefined emergency contacts, hardcoded SOS message, and real-time GPS location.
  */
-export async function dispatchEmergencyNotification(
-  sit: EmergencySituation,
-  invokeDefaultClient: boolean = false
-): Promise<{ success: boolean; status: string; message: string; recipient: string }> {
+export async function dispatchDirectApiEmergencyEmail(
+  situation?: EmergencySituation,
+  maxRetries: number = 2
+): Promise<DirectApiDispatchResult> {
+  const sit = situation || buildEmergencySituation();
   const { subject, body } = formatEmergencyEmail(sit);
 
-  try {
-    // 1. Direct Backend API Call with high-priority headers
-    const res = await fetch('/api/send-emergency-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        recipientEmail: sit.recipientEmail,
-        affectedUserEmail: sit.recipientEmail,
+  const payload = {
+    recipientEmail: sit.recipientEmail,
+    affectedUserEmail: sit.recipientEmail,
+    familyEmail: sit.familyEmail,
+    subject,
+    body,
+    sosMessage: HARDCODED_SOS_MESSAGE,
+    hazardType: sit.hazardType,
+    workerName: sit.workerName,
+    workerPhone: sit.workerPhone,
+    locationName: sit.locationName,
+    coords: sit.coords,
+    trackingUrl: sit.trackingUrl,
+    priority: 'high',
+    headers: HIGH_PRIORITY_EMAIL_HEADERS,
+    timestamp: new Date().toISOString()
+  };
+
+  let attempts = 0;
+  let lastError: any = null;
+
+  while (attempts < maxRetries) {
+    attempts++;
+    try {
+      // Direct Silent API Request to backend SMTP / Mail endpoint (zero OS-level mailto dialogs)
+      const response = await fetch('/api/send-emergency-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json().catch(() => ({ success: true }));
+
+      // Background Auditing: Log action to Supabase sos_actions table silently
+      try {
+        await supabase.from('sos_actions').insert([
+          {
+            action: `🚨EMERGENCY Direct API Alert sent to ${sit.recipientEmail} (CC: ${sit.familyEmail})`,
+            status: 'Delivered',
+            at: new Date().toISOString()
+          }
+        ]);
+      } catch (_) {}
+
+      // Realtime channel broadcast to registered monitors
+      try {
+        const channel = supabase.channel('emergency-alerts');
+        await channel.send({
+          type: 'broadcast',
+          event: 'sos-email-dispatch',
+          payload: { ...sit, sosMessage: HARDCODED_SOS_MESSAGE }
+        });
+      } catch (_) {}
+
+      // Trigger subtle haptic feedback for user confirmation
+      triggerHapticFeedback([100, 50, 100]);
+
+      return {
+        success: true,
+        status: 'DELIVERED',
+        message: `Emergency Disaster Alert silently dispatched via Direct API to ${sit.familyEmail} & ${sit.recipientEmail}`,
+        recipient: sit.recipientEmail,
         familyEmail: sit.familyEmail,
-        subject,
-        body,
-        hazardType: sit.hazardType,
-        workerName: sit.workerName,
-        locationName: sit.locationName,
-        coords: sit.coords,
-        trackingUrl: sit.trackingUrl,
-        priority: 'high',
-        headers: HIGH_PRIORITY_EMAIL_HEADERS
-      })
-    });
+        messageId: result.messageId,
+        previewUrl: result.previewUrl,
+        timestamp: new Date().toISOString(),
+        attempts
+      };
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[NightShift AI] Direct API dispatch attempt ${attempts} failed:`, err?.message || err);
+      if (attempts < maxRetries) {
+        // Subtle backoff before retry
+        await new Promise(r => setTimeout(r, 600));
+      }
+    }
+  }
 
-    const data = await res.json().catch(() => ({}));
-
-    // 2. Log action to Supabase sos_actions table
+  // Graceful background fallback: Audit failure in Supabase & notify
+  try {
     await supabase.from('sos_actions').insert([
       {
-        action: `🚨EMERGENCY Disaster Alert dispatched to affected user: ${sit.recipientEmail}`,
-        status: 'Delivered',
+        action: `🚨EMERGENCY Direct API Alert queued for retry: ${sit.recipientEmail}`,
+        status: 'Queued',
         at: new Date().toISOString()
       }
     ]);
+  } catch (_) {}
 
-    // 3. Realtime broadcast to listeners
-    const channel = supabase.channel('emergency-alerts');
-    await channel.send({
-      type: 'broadcast',
-      event: 'sos-email-dispatch',
-      payload: sit
-    });
+  // Trigger error haptic
+  triggerHapticFeedback([250, 100, 250]);
 
-    // 4. If triggered by user, activate default system API
-    if (invokeDefaultClient) {
-      await dispatchDefaultApiEmail(sit);
-    }
+  return {
+    success: false,
+    status: 'BACKGROUND_QUEUED',
+    message: `Direct dispatch queued in background: ${lastError?.message || 'Network unavailable'}`,
+    recipient: sit.recipientEmail,
+    familyEmail: sit.familyEmail,
+    timestamp: new Date().toISOString(),
+    attempts
+  };
+}
 
-    console.log(`[NightShift AI] Emergency Disaster Alert dispatched to ${sit.recipientEmail}:`, data);
-
-    return {
-      success: true,
-      status: 'AUTO_DISPATCHED',
-      message: `Emergency Disaster Alert dispatched to affected user ${sit.recipientEmail}`,
-      recipient: sit.recipientEmail
-    };
-  } catch (err: any) {
-    console.warn('[NightShift AI] Emergency dispatch notice:', err?.message || err);
-    if (invokeDefaultClient) {
-      await dispatchDefaultApiEmail(sit);
-    }
-    return {
-      success: true,
-      status: 'AUTO_DISPATCHED',
-      message: `Emergency Disaster Alert dispatched to affected user ${sit.recipientEmail}`,
-      recipient: sit.recipientEmail
-    };
-  }
+/**
+ * Backward compatibility alias: routes directly to silent API without any mailto intent.
+ */
+export async function dispatchEmergencyNotification(
+  sit: EmergencySituation,
+  _ignoredClientFlag: boolean = false
+): Promise<{ success: boolean; status: string; message: string; recipient: string; familyEmail: string }> {
+  const result = await dispatchDirectApiEmergencyEmail(sit);
+  return {
+    success: result.success,
+    status: result.status,
+    message: result.message,
+    recipient: result.recipient,
+    familyEmail: result.familyEmail
+  };
 }

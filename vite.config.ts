@@ -145,6 +145,13 @@ function emergencyEmailPlugin(): Plugin {
                             HAZARD TYPE: ${hazardType}
                           </p>
                         </div>
+
+                        <!-- Hardcoded Critical SOS Broadcast Message -->
+                        <div style="background: #262626; border-left: 4px solid #ef4444; border-radius: 8px; padding: 14px; margin: 16px 0;">
+                          <p style="margin: 0; font-size: 13px; font-weight: bold; color: #fca5a5; line-height: 1.5;">
+                            ${payload.sosMessage || '🚨 CRITICAL SOS DISASTER BROADCAST: Immediate evacuation alert activated. The worker is in an active danger zone and urgently requires emergency assistance and monitoring. Please review the live GPS coordinates, follow immediate safety protocols, and notify emergency responders at 112 if unreachable.'}
+                          </p>
+                        </div>
                         
                         <p style="font-size: 14px; color: #ECEEF3; line-height: 1.5;">
                           An active critical emergency alert has been broadcast for affected user <strong>${payload.workerName || 'Gurvesh Patil'}</strong>.
@@ -157,6 +164,7 @@ function emergencyEmailPlugin(): Plugin {
                           </h3>
                           <p style="margin: 4px 0; font-size: 13px;"><strong>Current Sector:</strong> ${payload.locationName || 'Live Telemetry Sector · Nagpur'}</p>
                           <p style="margin: 4px 0; font-size: 13px;"><strong>GPS Coordinates:</strong> ${payload.coords?.lat || '21.1463'}, ${payload.coords?.lng || '79.0849'}</p>
+                          <p style="margin: 4px 0; font-size: 13px;"><strong>Primary Family Alert:</strong> ${familyEmail}</p>
                           <p style="margin: 4px 0; font-size: 13px;"><strong>Medical Profile:</strong> Blood Group O+ (Universal Donor) · No known drug allergies</p>
                         </div>
 
@@ -209,11 +217,12 @@ function emergencyEmailPlugin(): Plugin {
                   status: 'DELIVERED',
                   dispatchedDirectly: true,
                   recipient: recipient,
-                  cc: 'patilgurveshp@gmail.com',
+                  familyEmail: familyEmail,
+                  cc: familyEmail,
                   messageId: messageId,
                   previewUrl: previewUrl,
                   timestamp: new Date().toISOString(),
-                  message: `Emergency notification successfully sent directly to ${recipient}`
+                  message: `Emergency notification successfully sent directly to ${recipient} (CC: ${familyEmail})`
                 })
               );
             } catch (e: any) {
