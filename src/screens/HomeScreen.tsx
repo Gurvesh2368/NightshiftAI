@@ -45,7 +45,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [userCoords, setUserCoords] = useState<GeoCoordinates>(DEFAULT_COORDS);
   const [currentAddress, setCurrentAddress] = useState<string>(() => {
     const savedCity = typeof localStorage !== 'undefined' ? localStorage.getItem('nightshift_live_city') : null;
-    return savedCity ? `Live in ${savedCity} · Connecting Telemetry...` : 'Detecting Live Position...';
+    return savedCity ? `Live in ${savedCity} · Telemetry Loop Connected` : 'Detecting Live Position...';
   });
   const [batteryStatus, setBatteryStatus] = useState<string>('84% · Normal');
   const [selectedDestName, setSelectedDestName] = useState<string>('Home (Safe Arrival Hub)');
@@ -58,9 +58,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [initialPlans]);
 
-  // Obtain real device location & battery on mount
+  // Obtain real device location & battery on mount and maintain continuous telemetry loop
   useEffect(() => {
     let unwatch: (() => void) | null = null;
+    let telemetryLoop: any = null;
 
     const initLocation = async () => {
       const coords = await getCurrentUserLocation();
@@ -77,7 +78,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setUserCoords(updated);
       });
 
-      // Calculate 3 real routes from live GPS position to Home Safe Hub
+      // Calculate 3 distinct real routes from live GPS position to Home Safe Hub
       try {
         const defaultDest = {
           lat: coords.lat + 0.009,
@@ -99,8 +100,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     initLocation();
 
+    // Continuous 5-second telemetry heartbeat loop
+    telemetryLoop = setInterval(async () => {
+      try {
+        const batt = await getLiveBatteryLevel();
+        setBatteryStatus(batt);
+      } catch (_) {}
+    }, 5000);
+
     return () => {
       if (unwatch) unwatch();
+      if (telemetryLoop) clearInterval(telemetryLoop);
     };
   }, []);
 
@@ -163,15 +173,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
-      {/* Real Live Telemetry Status Bar */}
+      {/* Real Live Telemetry Status Bar with Loop Active Pulse */}
       <div className="p-3 rounded-2xl bg-[#181C17] border border-[#2C342A] space-y-2 my-2 shadow-md">
         <div className="flex items-center justify-between text-[11px] font-mono">
           <div className="flex items-center gap-1.5 text-[#C8DC35] font-bold">
             <Radio className="h-3 w-3 animate-pulse text-[#C8DC35]" />
-            <span>LIVE GPS TELEMETRY</span>
+            <span>LIVE GPS TELEMETRY LOOP</span>
           </div>
           <span className="text-[10px] text-[#9BA398] font-bold bg-[#0F1210] px-2 py-0.5 rounded border border-[#2C342A]">
-            GPS Accuracy: ±{userCoords.accuracy || 8}m
+            Accuracy: ±{userCoords.accuracy || 8}m
           </span>
         </div>
 
@@ -232,16 +242,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         />
       )}
 
-      {/* 3 Routes Starting-to-Ending Corridor Map Preview */}
+      {/* Clean Starting-to-Ending Corridor Map Preview (Uncluttered) */}
       {currentPlan?.polyline && currentPlan.polyline.length > 1 && (
-        <div className="my-3 rounded-3xl overflow-hidden border border-[#2C342A] bg-[#181C17] p-3 space-y-2 shadow-xl">
-          <div className="flex items-center justify-between pb-1">
+        <div className="my-3 rounded-3xl overflow-hidden border border-[#2C342A] bg-[#181C17] p-3 space-y-2.5 shadow-xl">
+          <div className="flex items-center justify-between pb-0.5">
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#F4F6F2]">
               <Compass className="h-4 w-4 text-[#C8DC35]" />
-              <span>Preferred Route Corridor</span>
+              <span>Route Corridor Preview</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] font-mono text-[#C8DC35] bg-[#0F1210] px-2 py-0.5 rounded border border-[#2C342A]">
-              <span>★ {selectedMode.toUpperCase()} PREFERRED</span>
+              <span className="capitalize font-black">{selectedMode}</span>
               <span>·</span>
               <span>{currentPlan.etaP50Min} min</span>
             </div>
@@ -250,17 +260,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <MapView
             className="h-60 w-full"
             routeCoordinates={currentPlan.polyline}
-            alternateRoutes={plans.map(p => ({
-              id: p.id,
-              mode: p.mode,
-              coordinates: p.polyline || [],
-              label: p.name,
-              distanceKm: p.legs[0]?.distanceKm,
-              durationMin: p.etaP50Min,
-              safetyScore: p.safetyScore
-            }))}
-            selectedRouteMode={selectedMode}
-            onSelectRouteMode={mode => onSelectMode(mode)}
             currentPosition={[userCoords.lng, userCoords.lat]}
             center={[userCoords.lng, userCoords.lat]}
             startLabel="LIVE START"
@@ -268,8 +267,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             fitBoundsOnRoute={true}
           />
 
-          {/* 3 Route Options Selectors */}
-          <div className="grid grid-cols-3 gap-1.5 pt-1 text-[10px] font-mono">
+          {/* 3 Clean Route Options Selectors */}
+          <div className="grid grid-cols-3 gap-1.5 pt-0.5 text-[10px] font-mono">
             {plans.map(p => {
               const isSelected = p.mode === selectedMode;
               const colorDot =
@@ -284,20 +283,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   onClick={() => onSelectMode(p.mode)}
                   className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-[#252B23] border-[#C8DC35] text-white shadow-md ring-1 ring-[#C8DC35]'
+                      ? 'bg-[#252B23] border-[#C8DC35] text-white shadow-md'
                       : 'bg-[#121512] border-[#2C342A] text-zinc-400 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 font-bold">
-                      <span className={`w-2 h-2 rounded-full ${colorDot} shrink-0`}></span>
-                      <span className="capitalize truncate text-[11px] text-[#F4F6F2]">{p.mode}</span>
-                    </div>
-                    {isSelected && (
-                      <span className="text-[8px] font-black text-[#C8DC35] uppercase bg-[#C8DC35]/20 px-1 py-0.5 rounded">
-                        Active
-                      </span>
-                    )}
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span className={`w-2 h-2 rounded-full ${colorDot} shrink-0`}></span>
+                    <span className="capitalize truncate text-[11px] text-[#F4F6F2]">{p.mode}</span>
                   </div>
                   <div className="text-[9px] text-[#9BA398] mt-0.5 truncate">
                     {p.etaP50Min}m · {p.mode === 'safest' ? `Score ${p.safetyScore}` : p.mode === 'cheapest' ? `₹${p.fareInr}` : 'Direct'}
@@ -309,9 +301,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           <div className="flex items-center justify-between text-[11px] font-mono text-[#9BA398] pt-1 px-1 border-t border-[#2C342A]/60">
             <div className="flex items-center gap-1.5 truncate max-w-[45%]">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#C8DC35] shrink-0 inline-block"></span>
+              <span className="w-2 h-2 rounded-full bg-[#C8DC35] shrink-0 inline-block"></span>
               <span className="text-[#F4F6F2] font-semibold truncate">
-                {currentAddress || 'Live GPS Location'}
+                {currentAddress || 'Live Location'}
               </span>
             </div>
             <ArrowRight className="h-3.5 w-3.5 text-[#C8DC35] shrink-0" />
@@ -319,7 +311,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <span className="text-[#F4F6F2] font-semibold truncate">
                 {selectedDestName}
               </span>
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 inline-block"></span>
+              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 inline-block"></span>
             </div>
           </div>
         </div>

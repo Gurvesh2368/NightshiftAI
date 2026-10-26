@@ -83,7 +83,7 @@ export function generateCorridorPolyline(
   origin: GeoCoordinates,
   dest: { lat: number; lng: number },
   curvature: number, // 0 = direct shortest, 1.0 = arterial safe avenue, -1.0 = transit bus corridor
-  steps: number = 14
+  steps: number = 12
 ): [number, number][] {
   const polyline: [number, number][] = [];
   const dLng = dest.lng - origin.lng;
@@ -91,7 +91,7 @@ export function generateCorridorPolyline(
   const len = Math.sqrt(dLng * dLng + dLat * dLat) || 0.001;
 
   // Maximum lateral offset proportional to journey length (clamped to realistic urban corridor range)
-  const maxOffset = Math.min(Math.max(len * 0.22, 0.0018), 0.0055);
+  const maxOffset = Math.min(Math.max(len * 0.22, 0.0016), 0.0055);
   const perpLng = (-dLat / len) * maxOffset * curvature;
   const perpLat = (dLng / len) * maxOffset * curvature;
 
@@ -114,7 +114,7 @@ export function generateCorridorPolyline(
 }
 
 /**
- * Helper to query OSRM for a specific profile and list of waypoints with 2s timeout
+ * Helper to query OSRM for a specific profile and list of waypoints
  */
 async function fetchOsrmRoute(
   profile: 'walking' | 'driving',
@@ -123,10 +123,7 @@ async function fetchOsrmRoute(
   try {
     const coordsStr = points.map(p => `${p[0]},${p[1]}`).join(';');
     const url = `https://router.project-osrm.org/route/v1/${profile}/${coordsStr}?overview=full&geometries=geojson&steps=true`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
+    const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.routes || data.routes.length === 0) return null;
@@ -144,7 +141,7 @@ async function fetchOsrmRoute(
 
 /**
  * Calculates 3 DISTINCT real road routes from the user's LIVE location to the SAME final destination:
- * 1. Safest: Monitored Illuminated Arterial Avenue Corridor (Preferred)
+ * 1. Safest: Monitored Illuminated Arterial Avenue Corridor
  * 2. Fastest: Direct Shortest Physical Street Route
  * 3. Cheapest: Monitored Public Transit / Bus Thoroughfare Corridor
  */
@@ -153,6 +150,19 @@ export async function calculateRealTripPlans(
   dest: { lat: number; lng: number; name: string }
 ): Promise<TripPlan[]> {
   try {
+    // 1. Fetch Fastest (Direct Walking route)
+    const directResult = await fetchOsrmRoute('walking', [
+      [origin.lng, origin.lat],
+      [dest.lng, dest.lat]
+    ]);
+
+    // 2. Fetch Transit (Vehicular / Bus thoroughfare route)
+    const transitResult = await fetchOsrmRoute('driving', [
+      [origin.lng, origin.lat],
+      [dest.lng, dest.lat]
+    ]);
+
+    // 3. Fetch Safest (Arterial corridor via primary illuminated boulevard)
     const dLng = dest.lng - origin.lng;
     const dLat = dest.lat - origin.lat;
     const len = Math.sqrt(dLng * dLng + dLat * dLat) || 0.001;
@@ -162,21 +172,16 @@ export async function calculateRealTripPlans(
       parseFloat((origin.lat + dLat * 0.5 + (dLng / len) * offset).toFixed(6))
     ];
 
-    // Fetch routes in parallel with 2s timeout
-    const [directRes, transitRes, safestRes] = await Promise.allSettled([
-      fetchOsrmRoute('walking', [[origin.lng, origin.lat], [dest.lng, dest.lat]]),
-      fetchOsrmRoute('driving', [[origin.lng, origin.lat], [dest.lng, dest.lat]]),
-      fetchOsrmRoute('walking', [[origin.lng, origin.lat], midArterialWaypoint, [dest.lng, dest.lat]])
+    const safestResult = await fetchOsrmRoute('walking', [
+      [origin.lng, origin.lat],
+      midArterialWaypoint,
+      [dest.lng, dest.lat]
     ]);
 
-    const directResult = directRes.status === 'fulfilled' ? directRes.value : null;
-    const transitResult = transitRes.status === 'fulfilled' ? transitRes.value : null;
-    const safestResult = safestRes.status === 'fulfilled' ? safestRes.value : null;
-
     // Prepare polylines (guaranteeing 3 distinct geometries starting at origin and ending at dest)
-    let fastestPolyline = directResult?.coordinates ? [...directResult.coordinates] : null;
-    let safestPolyline = safestResult?.coordinates ? [...safestResult.coordinates] : null;
-    let transitPolyline = transitResult?.coordinates ? [...transitResult.coordinates] : null;
+    let fastestPolyline = directResult?.coordinates;
+    let safestPolyline = safestResult?.coordinates;
+    let transitPolyline = transitResult?.coordinates;
 
     // Fallback distinct geometry if any OSRM result is missing or identical
     if (!fastestPolyline || fastestPolyline.length < 2) {
@@ -241,7 +246,7 @@ export async function calculateRealTripPlans(
       { text: `Alight at destination stop and enter safe arrival zone`, distanceM: 80, action: 'alight_transit' }
     ];
 
-    // Plan 1: Safest Illuminated Corridor (Preferred Route)
+    // Plan 1: Safest Illuminated Corridor
     const safestLeg: RouteLeg = {
       seq: 1,
       kind: 'walk',
@@ -273,13 +278,13 @@ export async function calculateRealTripPlans(
       overallStatus: 'KNOWN',
       statusChip: {
         status: 'KNOWN',
-        label: 'PREFERRED (94/100)',
+        label: 'MAX SAFETY (94/100)',
         detail: 'Passes active 24/7 trauma ward, police chowki, and illuminated thoroughfares'
       },
       whyThisScore: [
         'Continuous high-lux municipal LED lighting grid',
         'Passes verified 24/7 staffed hospital trauma ward & police outpost',
-        'Preferred route calculated live from your current GPS position to destination'
+        'Route calculated live from your current GPS position to destination'
       ],
       legs: [safestLeg],
       dataPoints: [],
@@ -416,7 +421,7 @@ export function getFallbackPlans(
     mode: 'safest',
     name: `Safest Route (Illuminated Arterial Corridor)`,
     summary: `Verified direct arterial pedestrian safety corridor to ${dest.name}`,
-    safetyScore: 94,
+    safetyScore: 92,
     safetyTier: 'High',
     etaP50Min: 18,
     etaP90Min: 22,
@@ -427,7 +432,7 @@ export function getFallbackPlans(
     overallStatus: 'KNOWN',
     statusChip: {
       status: 'KNOWN',
-      label: 'PREFERRED (94/100)',
+      label: 'MAX SAFETY (92/100)',
       detail: 'Arterial boulevard along monitored roads with verified 24/7 streetlighting'
     },
     whyThisScore: [
@@ -512,7 +517,7 @@ export function getFallbackPlans(
     mode: 'cheapest',
     name: `Monitored Night Transit Corridor (Bus & Feeder)`,
     summary: `Public transit & bus thoroughfare route towards ${dest.name}`,
-    safetyScore: 86,
+    safetyScore: 85,
     safetyTier: 'Good',
     etaP50Min: 12,
     etaP90Min: 16,

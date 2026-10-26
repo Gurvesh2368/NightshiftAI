@@ -132,7 +132,7 @@ export const BluetoothMeshChain: React.FC<BluetoothMeshChainProps> = ({
           </span>
         </div>
         <span className="text-[10px] text-[#9BA398] bg-[#181C17] px-2 py-0.5 rounded border border-[#2C342A]">
-          Heartbeat: 2.8s
+          Loop: 2.2s · Relayed: {meshState.packetsTransmitted || 0} pkts
         </span>
       </div>
 
@@ -263,7 +263,7 @@ export const BluetoothMeshChain: React.FC<BluetoothMeshChainProps> = ({
             className="flex-1 py-3 px-3 rounded-xl bg-[#C8DC35] hover:bg-[#D4E83E] text-[#0F1210] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
           >
             <Radio className="h-4 w-4" />
-            <span>Broadcast BLE Mesh SOS (Offline)</span>
+            <span>Start BLE Mesh Relay Loop</span>
           </button>
         ) : (
           <button
@@ -272,7 +272,7 @@ export const BluetoothMeshChain: React.FC<BluetoothMeshChainProps> = ({
             className="flex-1 py-3 px-3 rounded-xl bg-[#1E2512] border border-[#C8DC35]/60 hover:bg-[#283218] text-[#C8DC35] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
           >
             <RefreshCw className="h-4 w-4 animate-spin" />
-            <span>Re-Broadcast Mesh Chain</span>
+            <span>🔄 Re-Trigger Mesh Loop (Cycle #{meshState.loopCycle})</span>
           </button>
         )}
 
