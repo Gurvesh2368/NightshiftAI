@@ -377,6 +377,28 @@ export const MOCK_PLACES: OfflinePlace[] = [
     opening_hours: 'Open until 4:00 AM',
     distanceKm: 0.9,
     fetchedAt: Date.now()
+  },
+  {
+    id: 'p6',
+    name: 'Central Transit Interchange Bus Stop',
+    type: 'bus_stop',
+    lat: 19.0655,
+    lng: 72.8660,
+    staffed_24h: true,
+    opening_hours: 'Lit Shelter & CCTV · 24/7 Bus Transit',
+    distanceKm: 0.4,
+    fetchedAt: Date.now()
+  },
+  {
+    id: 'p7',
+    name: 'The Grand Transit Safe Haven Hotel',
+    type: 'hotel',
+    lat: 19.0695,
+    lng: 72.8730,
+    staffed_24h: true,
+    opening_hours: '24/7 Front Desk & Security Staffed',
+    distanceKm: 0.7,
+    fetchedAt: Date.now()
   }
 ];
 

@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { watchUserLocation, GeoCoordinates, DEFAULT_COORDS } from '../lib/geo';
+import { generateLivePlaces } from '../lib/places';
 
 interface NavigateScreenProps {
   plan: TripPlan;
@@ -236,6 +237,7 @@ export const NavigateScreen: React.FC<NavigateScreenProps> = ({
           routeCoordinates={polyline}
           currentPosition={currentCoords}
           center={currentCoords}
+          places={generateLivePlaces(userLocation)}
           zoom={16}
           startLabel="LIVE START"
           endLabel="FINAL DESTINATION"

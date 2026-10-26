@@ -11,13 +11,15 @@ export interface CachedTrip {
 export interface OfflinePlace {
   id: string;
   name: string;
-  type: 'hospital' | 'pharmacy' | 'police' | 'food' | 'water' | 'toilet' | 'waiting_spot';
+  type: 'hospital' | 'pharmacy' | 'police' | 'food' | 'water' | 'toilet' | 'waiting_spot' | 'bus_stop' | 'hotel';
   lat: number;
   lng: number;
   staffed_24h: boolean;
   opening_hours: string;
   distanceKm?: number;
   fetchedAt: number;
+  phone?: string;
+  address?: string;
 }
 
 export interface OfflineContact {

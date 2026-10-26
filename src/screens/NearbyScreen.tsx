@@ -7,6 +7,8 @@ import {
   Hospital,
   Pill,
   ShieldAlert,
+  Bus,
+  Hotel,
   Coffee,
   Navigation,
   PhoneCall,
@@ -17,6 +19,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { getCurrentUserLocation, GeoCoordinates, DEFAULT_COORDS } from '../lib/geo';
+import { generateLivePlaces } from '../lib/places';
 
 interface NearbyScreenProps {
   initialFilter?: string;
@@ -25,67 +28,10 @@ interface NearbyScreenProps {
 
 // Dynamically generate verified safe havens relative to the user's real live coordinates
 export function getDynamicSafePlaces(coords: GeoCoordinates): OfflinePlace[] {
-  const cityName = (typeof localStorage !== 'undefined' && localStorage.getItem('nightshift_live_city')) || 'Local Area';
-  return [
-    {
-      id: 'live_hospital_trauma',
-      name: `${cityName} Civil Hospital & 24/7 Trauma Emergency`,
-      type: 'hospital',
-      lat: coords.lat + 0.0072,
-      lng: coords.lng + 0.0045,
-      staffed_24h: true,
-      opening_hours: '24/7 Emergency Ward Always Open',
-      distanceKm: 0.9,
-      fetchedAt: Date.now()
-    },
-    {
-      id: 'live_police_chowki',
-      name: `${cityName} Central Police Station & Women Assistance Desk`,
-      type: 'police',
-      lat: coords.lat - 0.0055,
-      lng: coords.lng - 0.0062,
-      staffed_24h: true,
-      opening_hours: '24/7 Patrol Officers On Duty · Active Beat',
-      distanceKm: 0.8,
-      fetchedAt: Date.now()
-    },
-    {
-      id: 'live_pharmacy_24h',
-      name: 'Apollo 24/7 Night Chemist & Emergency Pharmacy',
-      type: 'pharmacy',
-      lat: coords.lat + 0.0035,
-      lng: coords.lng - 0.0048,
-      staffed_24h: true,
-      opening_hours: '24/7 Licensed Pharmacist & Trauma First-Aid',
-      distanceKm: 0.5,
-      fetchedAt: Date.now()
-    },
-    {
-      id: 'live_transit_depot',
-      name: `${cityName} Monitored Transit Interchange & Night Safe Stand`,
-      type: 'waiting_spot',
-      lat: coords.lat - 0.0085,
-      lng: coords.lng + 0.0075,
-      staffed_24h: true,
-      opening_hours: 'CCTV Monitored · Lit Waiting Area & Security',
-      distanceKm: 1.2,
-      fetchedAt: Date.now()
-    },
-    {
-      id: 'live_fuel_station',
-      name: 'IndianOil All-Night 24/7 Staffed Fuel Station & Convenience',
-      type: 'food',
-      lat: coords.lat + 0.0050,
-      lng: coords.lng + 0.0080,
-      staffed_24h: true,
-      opening_hours: '24/7 White Floodlit Forecourt & Security Guard',
-      distanceKm: 0.7,
-      fetchedAt: Date.now()
-    }
-  ];
+  return generateLivePlaces(coords);
 }
 
-const BASE_SAFE_PLACES: OfflinePlace[] = getDynamicSafePlaces(DEFAULT_COORDS);
+const BASE_SAFE_PLACES: OfflinePlace[] = generateLivePlaces(DEFAULT_COORDS);
 
 export const NearbyScreen: React.FC<NearbyScreenProps> = ({
   initialFilter = 'all',
@@ -100,39 +46,19 @@ export const NearbyScreen: React.FC<NearbyScreenProps> = ({
   useEffect(() => {
     getCurrentUserLocation().then(coords => {
       setUserCoords(coords);
-      const dynamicPlaces = getDynamicSafePlaces(coords);
-
-      // Compute exact distance in km for all places
-      const updated = dynamicPlaces.map(p => {
-        const R = 6371;
-        const dLat = ((p.lat - coords.lat) * Math.PI) / 180;
-        const dLon = ((p.lng - coords.lng) * Math.PI) / 180;
-        const a =
-          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos((coords.lat * Math.PI) / 180) *
-            Math.cos((p.lat * Math.PI) / 180) *
-            Math.sin(dLon / 2) *
-            Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distanceKm = Math.round(R * c * 10) / 10;
-
-        return { ...p, distanceKm };
-      });
-
-      // Sort by distance
-      updated.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
-      setPlaces(updated);
-      setSelectedPlace(updated[0]);
+      const dynamicPlaces = generateLivePlaces(coords);
+      setPlaces(dynamicPlaces);
+      setSelectedPlace(dynamicPlaces[0]);
     });
   }, []);
 
   const categories = [
     { id: 'all', label: 'All Safe Havens', icon: Compass },
-    { id: 'hospital', label: 'Trauma Hospitals', icon: Hospital },
-    { id: 'police', label: 'Police Chowkis', icon: ShieldAlert },
-    { id: 'pharmacy', label: '24/7 Pharmacies', icon: Pill },
-    { id: 'waiting_spot', label: 'Monitored Transit', icon: Compass },
-    { id: 'food', label: 'Lit Fuel & Food', icon: Coffee }
+    { id: 'pharmacy', label: 'Pharmacies', icon: Pill },
+    { id: 'hospital', label: 'Hospitals', icon: Hospital },
+    { id: 'police', label: 'Police Stations', icon: ShieldAlert },
+    { id: 'bus_stop', label: 'Bus Stops', icon: Bus },
+    { id: 'hotel', label: 'Hotels', icon: Hotel }
   ];
 
   const filteredPlaces = places.filter(p => {
@@ -271,6 +197,12 @@ export const NearbyScreen: React.FC<NearbyScreenProps> = ({
                       ? 'bg-rose-950/80 text-rose-400'
                       : place.type === 'police'
                       ? 'bg-blue-950/80 text-blue-400'
+                      : place.type === 'pharmacy'
+                      ? 'bg-teal-950/80 text-teal-400'
+                      : place.type === 'bus_stop'
+                      ? 'bg-amber-950/80 text-amber-400'
+                      : place.type === 'hotel'
+                      ? 'bg-purple-950/80 text-purple-400'
                       : 'bg-[#252B23] text-[#C8DC35]'
                   }`}
                 >
@@ -278,8 +210,14 @@ export const NearbyScreen: React.FC<NearbyScreenProps> = ({
                     <Hospital className="h-5 w-5" />
                   ) : place.type === 'police' ? (
                     <ShieldAlert className="h-5 w-5" />
-                  ) : (
+                  ) : place.type === 'pharmacy' ? (
                     <Pill className="h-5 w-5" />
+                  ) : place.type === 'bus_stop' ? (
+                    <Bus className="h-5 w-5" />
+                  ) : place.type === 'hotel' ? (
+                    <Hotel className="h-5 w-5" />
+                  ) : (
+                    <Compass className="h-5 w-5" />
                   )}
                 </div>
 

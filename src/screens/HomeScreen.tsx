@@ -17,11 +17,21 @@ import {
   RefreshCw,
   Radio,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  Hospital,
+  Pill,
+  ShieldAlert,
+  Bus,
+  Hotel,
+  Phone,
+  ShieldCheck,
+  X
 } from 'lucide-react';
 import { SupportedLang } from '../lib/tts';
 import { getCurrentUserLocation, watchUserLocation, reverseGeocode, getLiveBatteryLevel, GeoCoordinates, DEFAULT_COORDS } from '../lib/geo';
 import { calculateRealTripPlans } from '../lib/routing';
+import { OfflinePlace } from '../lib/db';
+import { generateLivePlaces } from '../lib/places';
 
 interface HomeScreenProps {
   plans: TripPlan[];
@@ -50,6 +60,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [batteryStatus, setBatteryStatus] = useState<string>('84% · Normal');
   const [selectedDestName, setSelectedDestName] = useState<string>('Home (Safe Arrival Hub)');
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+  const [nearbyPlaces, setNearbyPlaces] = useState<OfflinePlace[]>(() => generateLivePlaces(DEFAULT_COORDS));
+  const [activePoiFilter, setActivePoiFilter] = useState<string>('all');
+  const [selectedPoiPlace, setSelectedPoiPlace] = useState<OfflinePlace | null>(null);
 
   // Sync external plans if passed
   useEffect(() => {
@@ -66,6 +79,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const initLocation = async () => {
       const coords = await getCurrentUserLocation();
       setUserCoords(coords);
+      setNearbyPlaces(generateLivePlaces(coords));
 
       const addr = await reverseGeocode(coords.lat, coords.lng);
       setCurrentAddress(addr);
@@ -76,6 +90,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // Start watching live location
       unwatch = watchUserLocation(updated => {
         setUserCoords(updated);
+        setNearbyPlaces(generateLivePlaces(updated));
       });
 
       // Calculate 3 distinct real routes from live GPS position to Home Safe Hub
@@ -257,15 +272,91 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </div>
 
+          {/* Live POI Category Selector (Pharmacy, Hospital, Police Station, Bus Stops, Hotels) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 no-scrollbar text-[11px] font-bold">
+            {[
+              { id: 'all', label: 'All Live POIs' },
+              { id: 'pharmacy', label: '💊 Pharmacy' },
+              { id: 'hospital', label: '🏥 Hospital' },
+              { id: 'police', label: '👮 Police' },
+              { id: 'bus_stop', label: '🚏 Bus Stops' },
+              { id: 'hotel', label: '🏨 Hotels' }
+            ].map(cat => {
+              const isActive = activePoiFilter === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setActivePoiFilter(cat.id);
+                    setSelectedPoiPlace(null);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg shrink-0 transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#C8DC35] text-[#0F1210] font-black shadow'
+                      : 'bg-[#121512] text-[#9BA398] border border-[#2C342A] hover:text-white'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+
           <MapView
-            className="h-60 w-full"
+            className="h-64 w-full"
             routeCoordinates={currentPlan.polyline}
             currentPosition={[userCoords.lng, userCoords.lat]}
             center={[userCoords.lng, userCoords.lat]}
+            places={
+              activePoiFilter === 'all'
+                ? nearbyPlaces
+                : nearbyPlaces.filter(p => p.type === activePoiFilter)
+            }
+            onSelectPlace={place => setSelectedPoiPlace(place)}
             startLabel="LIVE START"
             endLabel="FINAL DESTINATION"
             fitBoundsOnRoute={true}
           />
+
+          {/* Selected Live POI Quick Card */}
+          {selectedPoiPlace && (
+            <div className="p-3 rounded-2xl bg-[#1E2512] border border-[#C8DC35] shadow-lg flex items-center justify-between gap-3 animate-in fade-in">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">
+                    {selectedPoiPlace.type === 'hospital' ? '🏥' :
+                     selectedPoiPlace.type === 'pharmacy' ? '💊' :
+                     selectedPoiPlace.type === 'police' ? '👮' :
+                     selectedPoiPlace.type === 'bus_stop' ? '🚏' :
+                     selectedPoiPlace.type === 'hotel' ? '🏨' : '📍'}
+                  </span>
+                  <span className="font-bold text-xs text-[#F4F6F2] truncate">
+                    {selectedPoiPlace.name}
+                  </span>
+                </div>
+                <div className="text-[10px] text-[#9BA398] mt-0.5 truncate">
+                  {selectedPoiPlace.opening_hours} · {selectedPoiPlace.distanceKm} km away
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {selectedPoiPlace.phone && (
+                  <a
+                    href={`tel:${selectedPoiPlace.phone}`}
+                    className="p-1.5 rounded-lg bg-[#2C342A] text-[#C8DC35] hover:bg-[#3B4638] transition-colors"
+                    title="Call"
+                  >
+                    <Phone className="h-3.5 w-3.5" />
+                  </a>
+                )}
+                <button
+                  onClick={() => setSelectedPoiPlace(null)}
+                  className="p-1 text-zinc-400 hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 3 Clean Route Options Selectors */}
           <div className="grid grid-cols-3 gap-1.5 pt-0.5 text-[10px] font-mono">

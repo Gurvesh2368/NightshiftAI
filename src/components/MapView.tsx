@@ -406,25 +406,55 @@ export const MapView: React.FC<MapViewProps> = ({
       el.className = 'cursor-pointer flex items-center justify-center';
 
       let bg = 'bg-emerald-600';
+      let hexColor = '#16a34a';
       let icon = '📍';
+      let typeLabel = 'SAFE PLACE';
 
       if (place.type === 'hospital') {
         bg = 'bg-rose-600';
+        hexColor = '#e11d48';
         icon = '🏥';
+        typeLabel = 'HOSPITAL';
       } else if (place.type === 'pharmacy') {
         bg = 'bg-teal-600';
+        hexColor = '#0d9488';
         icon = '💊';
+        typeLabel = 'PHARMACY';
       } else if (place.type === 'police') {
         bg = 'bg-blue-600';
+        hexColor = '#2563eb';
         icon = '👮';
+        typeLabel = 'POLICE STATION';
+      } else if (place.type === 'bus_stop') {
+        bg = 'bg-amber-600';
+        hexColor = '#d97706';
+        icon = '🚏';
+        typeLabel = 'BUS STOP';
+      } else if (place.type === 'hotel') {
+        bg = 'bg-purple-600';
+        hexColor = '#9333ea';
+        icon = '🏨';
+        typeLabel = 'HOTEL';
       } else if (place.type === 'waiting_spot') {
         bg = 'bg-indigo-600';
+        hexColor = '#4f46e5';
         icon = '🛡️';
+        typeLabel = 'TRANSIT SHELTER';
+      } else if (place.type === 'food') {
+        bg = 'bg-amber-500';
+        hexColor = '#f59e0b';
+        icon = '☕';
+        typeLabel = 'LIT FOOD & FUEL';
       }
 
       el.innerHTML = `
-        <div class="${bg} text-white p-1.5 rounded-full shadow-lg border-2 border-white text-xs hover:scale-125 transition-transform" title="${place.name}">
-          ${icon}
+        <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer;" class="poi-marker-container">
+          <div style="background-color: ${hexColor}; color: white; width: 30px; height: 30px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-size: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); border: 2px solid #ffffff; transition: transform 0.2s;" class="hover:scale-125" title="${place.name}">
+            ${icon}
+          </div>
+          <div style="margin-top: 2px; background: rgba(15,18,16,0.92); color: #F4F6F2; font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.25); white-space: nowrap; max-width: 95px; overflow: hidden; text-overflow: ellipsis; pointer-events: none; text-shadow: 0 1px 2px #000;">
+            ${place.name.split(' ')[0]}
+          </div>
         </div>
       `;
 
@@ -432,15 +462,25 @@ export const MapView: React.FC<MapViewProps> = ({
         if (onSelectPlace) onSelectPlace(place);
       });
 
+      const popupHtml = `
+        <div style="color: #18191B; padding: 6px 8px; font-family: sans-serif; min-width: 170px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+            <span style="font-size: 9px; font-weight: 900; background: #0F1210; color: #C8DC35; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">
+              ${typeLabel}
+            </span>
+            ${place.distanceKm !== undefined ? `<span style="font-size: 10px; font-weight: 800; color: #2563eb;">${place.distanceKm} km away</span>` : ''}
+          </div>
+          <strong style="font-size: 12px; color: #111827; display: block; line-height: 1.3;">${place.name}</strong>
+          <div style="font-size: 10px; color: #4b5563; margin-top: 4px;">${place.opening_hours}</div>
+          ${place.phone ? `<div style="font-size: 10px; color: #059669; font-weight: bold; margin-top: 3px;">📞 ${place.phone}</div>` : ''}
+          ${place.address ? `<div style="font-size: 9px; color: #6b7280; margin-top: 2px;">📍 ${place.address}</div>` : ''}
+        </div>
+      `;
+
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([place.lng, place.lat])
         .setPopup(
-          new maplibregl.Popup({ offset: 15, closeButton: false }).setHTML(`
-            <div style="color: #18191B; padding: 4px; font-family: sans-serif;">
-              <strong style="font-size: 12px;">${place.name}</strong>
-              <div style="font-size: 10px; color: #555; margin-top: 2px;">${place.opening_hours}</div>
-            </div>
-          `)
+          new maplibregl.Popup({ offset: 15, closeButton: false }).setHTML(popupHtml)
         )
         .addTo(map);
 
