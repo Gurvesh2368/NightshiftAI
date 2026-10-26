@@ -102,10 +102,10 @@ function emergencyEmailPlugin(env: Record<string, string> = {}): Plugin {
               const receivingEmail = payload.receivingEmail || payload.recipientEmail || payload.familyEmail || 'shyammar12345@gmail.com';
               const subject = payload.subject || '🚨EMERGENCY';
               const trackingUrl = payload.trackingUrl || 'http://localhost:5173/?view=contact_alert';
-              const hazardType = payload.hazardType || 'CRITICAL IMMINENT THREAT / SEVERE NIGHT DISASTER';
+              const hazardType = payload.hazardType || 'CRITICAL IMMINENT THREAT / SEVERE NIGHT HAZARD';
 
               console.log('====================================================');
-              console.log('>>> [EMERGENCY DISASTER ALERT DISPATCH EXECUTING]');
+              console.log('>>> [EMERGENCY ALERT DISPATCH EXECUTING]');
               console.log('Sharing Email (From / Worker):', sharingEmail);
               console.log('Receiving Email (To / Family):', receivingEmail);
               console.log('Worker:', payload.workerName || 'Gurvesh Patil');
@@ -113,17 +113,17 @@ function emergencyEmailPlugin(env: Record<string, string> = {}): Plugin {
               console.log('Location:', payload.locationName || 'Live Telemetry Sector');
               console.log('GPS Telemetry:', payload.coords);
               console.log('Subject:', subject);
-              console.log('Status: 100% RELEVANT EMERGENCY DISASTER ALERT SENT');
+              console.log('Status: 100% RELEVANT EMERGENCY ALERT SENT');
               console.log('====================================================');
 
               let previewUrl = '';
               let messageId = `msg_${Date.now()}`;
 
-              // Direct Nodemailer Dispatch with High-Priority Headers & Disaster Alert Template
+              // Direct Nodemailer Dispatch with High-Priority Headers & Emergency Alert Template
               if (transporter) {
                 try {
                   const info = await transporter.sendMail({
-                    from: `"🚨 Emergency Disaster Alert — NightShift AI" <${sharingEmail}>`,
+                    from: `"🚨 Emergency Alert — NightShift AI" <${sharingEmail}>`,
                     to: receivingEmail,
                     cc: sharingEmail,
                     subject: subject,
@@ -141,7 +141,7 @@ function emergencyEmailPlugin(env: Record<string, string> = {}): Plugin {
                         <div style="background: linear-gradient(90deg, #ef4444, #C8DC35); height: 6px; border-radius: 3px; margin-bottom: 20px;"></div>
                         
                         <div style="background: #450a0a; border: 1px solid #ef4444; border-radius: 12px; padding: 14px; margin-bottom: 16px; text-align: center;">
-                          <h1 style="color: #ffffff; margin: 0; font-size: 22px; letter-spacing: 1px;">🚨 EMERGENCY DISASTER ALERT</h1>
+                          <h1 style="color: #ffffff; margin: 0; font-size: 22px; letter-spacing: 1px;">🚨 EMERGENCY ALERT</h1>
                           <p style="color: #fca5a5; margin: 6px 0 0 0; font-size: 13px; font-weight: bold;">
                             HAZARD TYPE: ${hazardType}
                           </p>
@@ -150,7 +150,7 @@ function emergencyEmailPlugin(env: Record<string, string> = {}): Plugin {
                         <!-- Hardcoded Critical SOS Broadcast Message -->
                         <div style="background: #262626; border-left: 4px solid #ef4444; border-radius: 8px; padding: 14px; margin: 16px 0;">
                           <p style="margin: 0; font-size: 13px; font-weight: bold; color: #fca5a5; line-height: 1.5;">
-                            ${payload.sosMessage || '🚨 CRITICAL SOS DISASTER BROADCAST: Immediate evacuation alert activated. The worker is in an active danger zone and urgently requires emergency assistance and monitoring. Please review the live GPS coordinates, follow immediate safety protocols, and notify emergency responders at 112 if unreachable.'}
+                            ${payload.sosMessage || '🚨 CRITICAL SOS EMERGENCY BROADCAST: Immediate evacuation alert activated. The worker is in an active danger zone and urgently requires emergency assistance and monitoring. Please review the live GPS coordinates, follow immediate safety protocols, and notify emergency responders at 112 if unreachable.'}
                           </p>
                         </div>
                         
@@ -200,14 +200,14 @@ function emergencyEmailPlugin(env: Record<string, string> = {}): Plugin {
                   if (testUrl) {
                     previewUrl = testUrl;
                   }
-                  console.log('✅ Emergency Disaster Email Delivered! Message ID:', messageId);
+                  console.log('✅ Emergency Email Delivered! Message ID:', messageId);
                   if (previewUrl) console.log('Preview link:', previewUrl);
                 } catch (mailErr: any) {
                   console.warn('[NightShift Mailer] SMTP send notice:', mailErr.message);
                 }
               }
 
-              console.log('Status: 100% EMERGENCY DISASTER ALERT PROCESSED');
+              console.log('Status: 100% EMERGENCY ALERT PROCESSED');
               console.log('====================================================');
 
               res.setHeader('Content-Type', 'application/json');

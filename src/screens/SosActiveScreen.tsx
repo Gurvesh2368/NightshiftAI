@@ -80,7 +80,7 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
         if (res.success) {
           triggerHapticFeedback([100, 50, 100]);
           setToastNotification({
-            message: `✓ Emergency Disaster Alert silently dispatched via Direct API to ${res.familyEmail} & ${res.recipient}`,
+            message: `✓ Emergency Alert silently dispatched via Direct API to ${res.familyEmail} & ${res.recipient}`,
             type: 'success'
           });
           setTimeout(() => setToastNotification(null), 3500);
@@ -147,7 +147,7 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
         setEmailSentSuccess(true);
         triggerHapticFeedback([100, 50, 100]);
         setToastNotification({
-          message: `✓ Emergency Disaster Alert silently dispatched via Direct API to ${res.familyEmail} & ${res.recipient}`,
+          message: `✓ Emergency Alert silently dispatched via Direct API to ${res.familyEmail} & ${res.recipient}`,
           type: 'success'
         });
       } else {
@@ -314,7 +314,7 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
             ) : emailSentSuccess ? (
               <>
                 <CheckCircle2 className="h-4 w-4 text-black stroke-[3]" />
-                <span>✓ Emergency Disaster Alert Dispatched (Silent Direct API)</span>
+                <span>✓ Emergency Alert Dispatched (Silent Direct API)</span>
               </>
             ) : (
               <>

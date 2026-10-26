@@ -11,7 +11,7 @@ interface HelpScreenProps {
 export const HelpScreen: React.FC<HelpScreenProps> = ({
   onTriggerSos,
   contacts = [
-    { name: 'Affected User (patilgurveshp@gmail.com)', phone: '+91 98765 43210', status: 'Primary Disaster Alert' },
+    { name: 'Affected User (patilgurveshp@gmail.com)', phone: '+91 98765 43210', status: 'Primary Emergency Alert' },
     { name: 'Family Member (shyammar12345@gmail.com)', phone: '+91 98200 11223', status: 'Active · Auto Alert' },
     { name: 'Emergency Dispatch Desk', phone: '112', status: 'Direct Responder' }
   ]

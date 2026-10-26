@@ -11,14 +11,14 @@ import {
   HIGH_PRIORITY_EMAIL_HEADERS
 } from '../src/lib/emergencyEmail';
 
-describe('NightShift AI — Emergency Mail & Disaster Alert System', () => {
+describe('NightShift AI — Emergency Mail & Alert System', () => {
   const mockCoords = { lat: 19.0680, lng: 72.8745 };
 
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('builds emergency disaster situation targeting affected user from database (NOT admin/dev)', () => {
+  it('builds emergency situation targeting affected user from database (NOT admin/dev)', () => {
     const sit = buildEmergencySituation(mockCoords, 'hold_button', 'SEVERE FLASH FLOOD & STRUCTURAL COLLAPSE');
 
     // Sharing email: patilgurveshp@gmail.com, Receiving email: shyammar12345@gmail.com
@@ -46,10 +46,10 @@ describe('NightShift AI — Emergency Mail & Disaster Alert System', () => {
     // 2. Strict Subject line
     expect(subject).toBe('🚨EMERGENCY');
 
-    // 3. Body template: Emergency Disaster Alert with hardcoded SOS message
+    // 3. Body template: Emergency Alert with hardcoded SOS message
     expect(body.toLowerCase()).not.toContain('form submitted');
     expect(body.toLowerCase()).not.toContain('contact form');
-    expect(body).toContain('🚨EMERGENCY DISASTER ALERT');
+    expect(body).toContain('🚨EMERGENCY ALERT');
     expect(body).toContain(HARDCODED_SOS_MESSAGE);
     expect(body).toContain('HAZARD TYPE: HAZARDOUS CHEMICAL LEAK / INDUSTRIAL FIRE');
     expect(body).toContain('patilgurveshp@gmail.com');
