@@ -1,25 +1,28 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import nodemailer from 'nodemailer';
 
-function emergencyEmailPlugin(): Plugin {
+function emergencyEmailPlugin(env: Record<string, string> = {}): Plugin {
   let transporter: any = null;
+  const gmailUser = env.GMAIL_USER || process.env.GMAIL_USER || 'patilgurveshp@gmail.com';
+  const gmailPass = (env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD || 'gmui vtck bunh jcdd').replace(/\s+/g, ' ').trim();
 
-  // Initialize Nodemailer transporter
+  // Initialize Nodemailer transporter with Gmail App Password authentication
   const initTransporter = async () => {
     try {
-      // Check if user has configured Gmail App Password
-      const gmailPass = process.env.GMAIL_APP_PASSWORD;
       if (gmailPass) {
         transporter = nodemailer.createTransport({
-          service: 'gmail',
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true,
           auth: {
-            user: 'patilgurveshp@gmail.com',
+            user: gmailUser,
             pass: gmailPass
           }
         });
-        console.log('[NightShift Mailer] Initialized with Gmail SMTP service.');
+        await transporter.verify();
+        console.log(`[NightShift Mailer] ✅ Authenticated successfully with Gmail SMTP (${gmailUser}).`);
       } else {
         const testAccount = await nodemailer.createTestAccount();
         transporter = nodemailer.createTransport({
@@ -34,7 +37,7 @@ function emergencyEmailPlugin(): Plugin {
         console.log('[NightShift Mailer] Initialized direct SMTP transport (Ready).');
       }
     } catch (err: any) {
-      console.warn('[NightShift Mailer] Transporter fallback notice:', err.message);
+      console.warn('[NightShift Mailer] Gmail SMTP auth notice:', err.message);
     }
   };
 
@@ -95,18 +98,16 @@ function emergencyEmailPlugin(): Plugin {
           req.on('end', async () => {
             try {
               const payload = JSON.parse(body || '{}');
-              // Requirement 1: Dynamically sends to affected user's email address from database, NOT admin/dev email
-              const recipient = payload.recipientEmail || payload.affectedUserEmail || 'patilgurveshp@gmail.com';
-              const familyEmail = payload.familyEmail || process.env.VITE_FAMILY_EMAILS || 'shyammar12345@gmail.com';
-              // Requirement 2: Subject line must be exactly '🚨EMERGENCY'
+              const sharingEmail = payload.sharingEmail || payload.workerEmail || gmailUser;
+              const receivingEmail = payload.receivingEmail || payload.recipientEmail || payload.familyEmail || 'shyammar12345@gmail.com';
               const subject = payload.subject || '🚨EMERGENCY';
               const trackingUrl = payload.trackingUrl || 'http://localhost:5173/?view=contact_alert';
               const hazardType = payload.hazardType || 'CRITICAL IMMINENT THREAT / SEVERE NIGHT DISASTER';
 
               console.log('====================================================');
               console.log('>>> [EMERGENCY DISASTER ALERT DISPATCH EXECUTING]');
-              console.log('Affected User Recipient (To:):', recipient);
-              console.log('Primary Family Member (CC/Alert):', familyEmail);
+              console.log('Sharing Email (From / Worker):', sharingEmail);
+              console.log('Receiving Email (To / Family):', receivingEmail);
               console.log('Worker:', payload.workerName || 'Gurvesh Patil');
               console.log('Hazard Type:', hazardType);
               console.log('Location:', payload.locationName || 'Live Telemetry Sector');
@@ -122,9 +123,9 @@ function emergencyEmailPlugin(): Plugin {
               if (transporter) {
                 try {
                   const info = await transporter.sendMail({
-                    from: '"🚨 Emergency Disaster Alert — NightShift AI" <alerts@nightshift.ai>',
-                    to: recipient,
-                    cc: familyEmail,
+                    from: `"🚨 Emergency Disaster Alert — NightShift AI" <${sharingEmail}>`,
+                    to: receivingEmail,
+                    cc: sharingEmail,
                     subject: subject,
                     text: payload.body || subject,
                     priority: 'high',
@@ -164,7 +165,7 @@ function emergencyEmailPlugin(): Plugin {
                           </h3>
                           <p style="margin: 4px 0; font-size: 13px;"><strong>Current Sector:</strong> ${payload.locationName || 'Live Telemetry Sector · Nagpur'}</p>
                           <p style="margin: 4px 0; font-size: 13px;"><strong>GPS Coordinates:</strong> ${payload.coords?.lat || '21.1463'}, ${payload.coords?.lng || '79.0849'}</p>
-                          <p style="margin: 4px 0; font-size: 13px;"><strong>Primary Family Alert:</strong> ${familyEmail}</p>
+                          <p style="margin: 4px 0; font-size: 13px;"><strong>Receiving Contact (To:):</strong> ${receivingEmail}</p>
                           <p style="margin: 4px 0; font-size: 13px;"><strong>Medical Profile:</strong> Blood Group O+ (Universal Donor) · No known drug allergies</p>
                         </div>
 
@@ -216,13 +217,15 @@ function emergencyEmailPlugin(): Plugin {
                   success: true,
                   status: 'DELIVERED',
                   dispatchedDirectly: true,
-                  recipient: recipient,
-                  familyEmail: familyEmail,
-                  cc: familyEmail,
+                  recipient: receivingEmail,
+                  receivingEmail: receivingEmail,
+                  sharingEmail: sharingEmail,
+                  familyEmail: receivingEmail,
+                  cc: sharingEmail,
                   messageId: messageId,
                   previewUrl: previewUrl,
                   timestamp: new Date().toISOString(),
-                  message: `Emergency notification successfully sent directly to ${recipient} (CC: ${familyEmail})`
+                  message: `Emergency notification successfully sent from ${sharingEmail} to ${receivingEmail}`
                 })
               );
             } catch (e: any) {
@@ -385,10 +388,13 @@ function emergencyEmailPlugin(): Plugin {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), tailwindcss(), emergencyEmailPlugin()],
-  server: {
-    port: 5173,
-    host: true
-  }
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
+    plugins: [react(), tailwindcss(), emergencyEmailPlugin(env)],
+    server: {
+      port: 5173,
+      host: true
+    }
+  };
 });

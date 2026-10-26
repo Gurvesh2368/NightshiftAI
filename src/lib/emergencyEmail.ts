@@ -28,8 +28,8 @@ export function triggerHapticFeedback(pattern: number[] = [100, 50, 100]): boole
 export interface EmergencySituation {
   workerName: string;
   workerPhone: string;
-  workerEmail: string;
-  recipientEmail: string; // Dynamically targeted to affected user from database
+  workerEmail: string; // Sharing Email (patilgurveshp@gmail.com)
+  recipientEmail: string; // Receiving Email (shyammar12345@gmail.com)
   familyEmail: string; // Primary family member email (shyammar12345@gmail.com)
   recipientName: string;
   triggerType: 'hold_button' | 'voice_help' | 'missed_checkin' | 'manual';
@@ -105,10 +105,10 @@ export function buildEmergencySituation(
   return {
     workerName: affectedUser.name,
     workerPhone: affectedUser.phone,
-    workerEmail: affectedUser.email,
-    recipientEmail: affectedUser.email, // DYNAMICALLY TARGETS AFFECTED USER FROM DATABASE, NOT ADMIN/DEV EMAIL
-    familyEmail, // Primary Family Contact Email: shyammar12345@gmail.com
-    recipientName: affectedUser.name,
+    workerEmail: affectedUser.email, // Sharing email (patilgurveshp@gmail.com)
+    recipientEmail: familyEmail, // Receiving email (shyammar12345@gmail.com)
+    familyEmail, // Receiving email (shyammar12345@gmail.com)
+    recipientName: 'Family Emergency Contact',
     triggerType,
     hazardType,
     coords: resolvedCoords,
@@ -148,9 +148,8 @@ ${HARDCODED_SOS_MESSAGE}
 
 AFFECTED USER & CONTACT
 --------------------------------------------------
-• Affected User: ${sit.workerName}
-• Registered User Email: ${sit.recipientEmail}
-• Primary Family Member: ${sit.familyEmail}
+• Sharing Worker (Sender): ${sit.workerName} (${sit.workerEmail})
+• Receiving Contact (To:): ${sit.recipientEmail}
 • Emergency Phone: ${sit.workerPhone}
 • Incident Time: ${sit.timestamp}
 
@@ -232,8 +231,10 @@ export async function dispatchDirectApiEmergencyEmail(
   const { subject, body } = formatEmergencyEmail(sit);
 
   const payload = {
+    sharingEmail: sit.workerEmail, // Sharing: patilgurveshp@gmail.com
+    workerEmail: sit.workerEmail,
+    receivingEmail: sit.recipientEmail, // Receiving: shyammar12345@gmail.com
     recipientEmail: sit.recipientEmail,
-    affectedUserEmail: sit.recipientEmail,
     familyEmail: sit.familyEmail,
     subject,
     body,

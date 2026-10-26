@@ -21,11 +21,10 @@ describe('NightShift AI — Emergency Mail & Disaster Alert System', () => {
   it('builds emergency disaster situation targeting affected user from database (NOT admin/dev)', () => {
     const sit = buildEmergencySituation(mockCoords, 'hold_button', 'SEVERE FLASH FLOOD & STRUCTURAL COLLAPSE');
 
-    // 1. Recipient dynamically targets affected user's email from db, NOT developer/admin
-    expect(sit.recipientEmail).toBe('patilgurveshp@gmail.com');
-    expect(sit.recipientEmail).not.toBe('cricledge8292@gmail.com');
-    expect(sit.familyEmail).toBe('shyammar12345@gmail.com');
+    // Sharing email: patilgurveshp@gmail.com, Receiving email: shyammar12345@gmail.com
+    expect(sit.recipientEmail).toBe('shyammar12345@gmail.com');
     expect(sit.workerEmail).toBe('patilgurveshp@gmail.com');
+    expect(sit.familyEmail).toBe('shyammar12345@gmail.com');
     expect(sit.workerName).toBe('Gurvesh Patil');
     expect(sit.hazardType).toBe('SEVERE FLASH FLOOD & STRUCTURAL COLLAPSE');
     expect(sit.coords.lat).toBe(19.0680);
@@ -93,14 +92,14 @@ describe('NightShift AI — Emergency Mail & Disaster Alert System', () => {
 
     expect(result.success).toBe(true);
     expect(result.status).toBe('DELIVERED');
-    expect(result.recipient).toBe('patilgurveshp@gmail.com');
+    expect(result.recipient).toBe('shyammar12345@gmail.com');
     expect(result.familyEmail).toBe('shyammar12345@gmail.com');
 
     // Verify payload captured in the silent Direct API call
     expect(fetchSpy).toHaveBeenCalledWith('/api/send-emergency-email', expect.anything());
     expect(capturedPayload).toBeDefined();
-    expect(capturedPayload.recipientEmail).toBe('patilgurveshp@gmail.com');
-    expect(capturedPayload.familyEmail).toBe('shyammar12345@gmail.com');
+    expect(capturedPayload.sharingEmail).toBe('patilgurveshp@gmail.com');
+    expect(capturedPayload.receivingEmail).toBe('shyammar12345@gmail.com');
     expect(capturedPayload.sosMessage).toBe(HARDCODED_SOS_MESSAGE);
     expect(capturedPayload.coords.lat).toBe(19.0680);
     expect(capturedPayload.coords.lng).toBe(72.8745);
@@ -112,24 +111,20 @@ describe('NightShift AI — Emergency Mail & Disaster Alert System', () => {
     expect(() => triggerHapticFeedback([100, 50, 100])).not.toThrow();
   });
 
-  it('creates valid Gmail compose URL targeting affected user with 🚨EMERGENCY subject and CC to family member', () => {
+  it('creates valid Gmail compose URL targeting receiving email with 🚨EMERGENCY subject', () => {
     const sit = buildEmergencySituation(mockCoords, 'hold_button');
     const gmailUrl = getGmailComposeUrl(sit);
 
     expect(gmailUrl).toContain('https://mail.google.com/mail/?view=cm&fs=1');
-    expect(gmailUrl).toContain('to=patilgurveshp%40gmail.com');
-    expect(gmailUrl).toContain('cc=shyammar12345%40gmail.com');
-    expect(gmailUrl).not.toContain('to=cricledge8292%40gmail.com');
+    expect(gmailUrl).toContain('to=shyammar12345%40gmail.com');
     expect(gmailUrl).toContain('%F0%9F%9A%A8EMERGENCY'); // encoded 🚨EMERGENCY
   });
 
-  it('creates valid mailto link targeting affected user with 🚨EMERGENCY subject and CC to family member', () => {
+  it('creates valid mailto link targeting receiving email with 🚨EMERGENCY subject', () => {
     const sit = buildEmergencySituation(mockCoords, 'hold_button');
     const mailtoUrl = getMailtoUrl(sit);
 
-    expect(mailtoUrl.startsWith('mailto:patilgurveshp@gmail.com')).toBe(true);
-    expect(mailtoUrl).toContain('cc=shyammar12345%40gmail.com');
-    expect(mailtoUrl).not.toContain('mailto:cricledge8292@gmail.com');
+    expect(mailtoUrl.startsWith('mailto:shyammar12345@gmail.com')).toBe(true);
     expect(mailtoUrl).toContain('subject=%F0%9F%9A%A8EMERGENCY');
   });
 

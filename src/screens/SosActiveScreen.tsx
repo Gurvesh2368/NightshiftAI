@@ -277,12 +277,12 @@ export const SosActiveScreen: React.FC<SosActiveScreenProps> = ({
 
         <div className="p-3.5 rounded-xl bg-[#0F1210] border border-[#2C342A] space-y-2 text-[11px] font-mono">
           <div className="flex justify-between items-center">
-            <span className="text-[#9BA398]">Primary Family Email:</span>
-            <strong className="text-[#C8DC35]">{situation.familyEmail || 'shyammar12345@gmail.com'}</strong>
+            <span className="text-[#9BA398]">Receiving Email (To:):</span>
+            <strong className="text-[#C8DC35]">{situation.recipientEmail}</strong>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-[#9BA398]">Affected User Email:</span>
-            <span className="text-zinc-200">{situation.recipientEmail}</span>
+            <span className="text-[#9BA398]">Sharing Email (From:):</span>
+            <span className="text-zinc-200">{situation.workerEmail}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-[#9BA398]">Emergency SMS Mobile:</span>
