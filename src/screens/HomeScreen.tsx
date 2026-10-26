@@ -5,6 +5,7 @@ import { TrustReceiptSheet } from '../components/TrustReceiptSheet';
 import { ReadAloudButton } from '../components/ReadAloudButton';
 import { DestinationSearch } from '../components/DestinationSearch';
 import { TrustChip } from '../components/TrustChip';
+import { MapView } from '../components/MapView';
 import {
   CloudRain,
   Clock,
@@ -15,7 +16,8 @@ import {
   Loader2,
   RefreshCw,
   Radio,
-  CheckCircle2
+  CheckCircle2,
+  ArrowRight
 } from 'lucide-react';
 import { SupportedLang } from '../lib/tts';
 import { getCurrentUserLocation, watchUserLocation, reverseGeocode, getLiveBatteryLevel, GeoCoordinates, DEFAULT_COORDS } from '../lib/geo';
@@ -46,7 +48,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return savedCity ? `Live in ${savedCity} · Connecting Telemetry...` : 'Detecting Live Position...';
   });
   const [batteryStatus, setBatteryStatus] = useState<string>('84% · Normal');
-  const [selectedDestName, setSelectedDestName] = useState<string>('Search Destination');
+  const [selectedDestName, setSelectedDestName] = useState<string>('Home (Safe Arrival Hub)');
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
   // Sync external plans if passed
@@ -74,6 +76,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       unwatch = watchUserLocation(updated => {
         setUserCoords(updated);
       });
+
+      // Calculate real route from live GPS position to Home Safe Hub
+      try {
+        const defaultDest = {
+          lat: coords.lat + 0.009,
+          lng: coords.lng + 0.008,
+          name: 'Home (Safe Arrival Hub)'
+        };
+        const livePlans = await calculateRealTripPlans(coords, defaultDest);
+        if (livePlans.length > 0) {
+          setPlans(livePlans);
+          setSelectedDestName(defaultDest.name);
+          if (onUpdatePlans) {
+            onUpdatePlans(livePlans);
+          }
+        }
+      } catch (err) {
+        console.warn('[HomeScreen] Live route calculation fallback notice:', err);
+      }
     };
 
     initLocation();
@@ -209,6 +230,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           onOpenReceipt={() => setIsReceiptOpen(true)}
           onNavigate={() => onStartCheckin(currentPlan)}
         />
+      )}
+
+      {/* Active Starting-to-Ending Route Corridor Map Preview */}
+      {currentPlan?.polyline && currentPlan.polyline.length > 1 && (
+        <div className="my-3 rounded-3xl overflow-hidden border border-[#2C342A] bg-[#181C17] p-3 space-y-2 shadow-xl">
+          <div className="flex items-center justify-between pb-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#F4F6F2]">
+              <Compass className="h-4 w-4 text-[#C8DC35]" />
+              <span>Route Corridor Preview</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] font-mono text-[#C8DC35] bg-[#0F1210] px-2 py-0.5 rounded border border-[#2C342A]">
+              <span>{currentPlan.polyline.length} Waypoints</span>
+              <span>·</span>
+              <span>{currentPlan.etaP50Min} min</span>
+            </div>
+          </div>
+
+          <MapView
+            className="h-56 w-full"
+            routeCoordinates={currentPlan.polyline}
+            currentPosition={[userCoords.lng, userCoords.lat]}
+            center={[userCoords.lng, userCoords.lat]}
+            startLabel="START"
+            endLabel="DESTINATION"
+            fitBoundsOnRoute={true}
+          />
+
+          <div className="flex items-center justify-between text-[11px] font-mono text-[#9BA398] pt-1 px-1">
+            <div className="flex items-center gap-1.5 truncate max-w-[45%]">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#C8DC35] shrink-0 inline-block"></span>
+              <span className="text-[#F4F6F2] font-semibold truncate">
+                {currentPlan.legs[0]?.fromName || 'Start Position'}
+              </span>
+            </div>
+            <ArrowRight className="h-3.5 w-3.5 text-[#C8DC35] shrink-0" />
+            <div className="flex items-center gap-1.5 truncate max-w-[45%] justify-end">
+              <span className="text-[#F4F6F2] font-semibold truncate">
+                {currentPlan.legs[currentPlan.legs.length - 1]?.toName || selectedDestName}
+              </span>
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 inline-block"></span>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Live Environmental Lighting & Weather Card */}

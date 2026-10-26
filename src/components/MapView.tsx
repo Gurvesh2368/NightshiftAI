@@ -12,6 +12,9 @@ interface MapViewProps {
   zoom?: number;
   center?: [number, number];
   interactive?: boolean;
+  startLabel?: string;
+  endLabel?: string;
+  fitBoundsOnRoute?: boolean;
 }
 
 const MAP_API_KEY = import.meta.env.VITE_MAP_API_KEY || 'd66cc14691a444479868628a72658fb3';
@@ -24,11 +27,16 @@ export const MapView: React.FC<MapViewProps> = ({
   className = 'h-64 w-full',
   zoom = 14,
   center,
-  interactive = true
+  interactive = true,
+  startLabel = 'START',
+  endLabel = 'DESTINATION',
+  fitBoundsOnRoute = true
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const startMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const endMarkerRef = useRef<maplibregl.Marker | null>(null);
   const placeMarkersRef = useRef<maplibregl.Marker[]>([]);
   const [mapTheme, setMapTheme] = useState<'spinal' | 'osm'>('spinal');
 
@@ -102,6 +110,160 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
+  // Synchronizes route corridor polylines, start/end beacons, and camera framing
+  const syncRouteToMap = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (!map.isStyleLoaded()) {
+      map.once('styledata', () => syncRouteToMap());
+      return;
+    }
+
+    // Clean up if route is empty or invalid
+    if (!routeCoordinates || routeCoordinates.length < 2) {
+      if (map.getLayer('route-line')) map.removeLayer('route-line');
+      if (map.getLayer('route-glow')) map.removeLayer('route-glow');
+      if (map.getSource('route-corridor')) map.removeSource('route-corridor');
+      if (startMarkerRef.current) {
+        startMarkerRef.current.remove();
+        startMarkerRef.current = null;
+      }
+      if (endMarkerRef.current) {
+        endMarkerRef.current.remove();
+        endMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const routeGeoJson = {
+      type: 'Feature' as const,
+      properties: {},
+      geometry: {
+        type: 'LineString' as const,
+        coordinates: routeCoordinates
+      }
+    };
+
+    const source = map.getSource('route-corridor') as maplibregl.GeoJSONSource | undefined;
+    if (source) {
+      source.setData(routeGeoJson);
+    } else {
+      map.addSource('route-corridor', {
+        type: 'geojson',
+        data: routeGeoJson
+      });
+    }
+
+    // Outer illuminated neon glow layer
+    if (!map.getLayer('route-glow')) {
+      map.addLayer({
+        id: 'route-glow',
+        type: 'line',
+        source: 'route-corridor',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#15803d',
+          'line-width': 14,
+          'line-opacity': 0.8
+        }
+      });
+    }
+
+    // Core crisp tactical corridor route line
+    if (!map.getLayer('route-line')) {
+      map.addLayer({
+        id: 'route-line',
+        type: 'line',
+        source: 'route-corridor',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#C8DC35',
+          'line-width': 6,
+          'line-opacity': 1.0
+        }
+      });
+    }
+
+    // Visual START Marker (Origin Point)
+    const startCoord = routeCoordinates[0];
+    if (startCoord) {
+      if (!startMarkerRef.current) {
+        const startEl = document.createElement('div');
+        startEl.className = 'route-start-marker flex flex-col items-center cursor-pointer pointer-events-auto';
+        startEl.innerHTML = `
+          <div style="background-color: #C8DC35; color: #0F1210; font-weight: 900; font-size: 10px; padding: 2px 7px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); border: 2px solid #ffffff; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; font-family: ui-monospace, monospace;">
+            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background-color: #0F1210;"></span>
+            ${startLabel}
+          </div>
+          <div style="width: 14px; height: 14px; border-radius: 9999px; background-color: #C8DC35; border: 3px solid #ffffff; box-shadow: 0 0 14px #C8DC35; margin-top: 2px;"></div>
+        `;
+        startMarkerRef.current = new maplibregl.Marker({ element: startEl, anchor: 'bottom' })
+          .setLngLat(startCoord)
+          .setPopup(
+            new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(`
+              <div style="color: #18191B; padding: 4px 8px; font-family: sans-serif; font-size: 11px; font-weight: bold;">
+                🟢 Start: [${startCoord[1].toFixed(4)}, ${startCoord[0].toFixed(4)}]
+              </div>
+            `)
+          )
+          .addTo(map);
+      } else {
+        startMarkerRef.current.setLngLat(startCoord);
+      }
+    }
+
+    // Visual END Marker (Destination Point)
+    const endCoord = routeCoordinates[routeCoordinates.length - 1];
+    if (endCoord) {
+      if (!endMarkerRef.current) {
+        const endEl = document.createElement('div');
+        endEl.className = 'route-end-marker flex flex-col items-center cursor-pointer pointer-events-auto';
+        endEl.innerHTML = `
+          <div style="background-color: #ef4444; color: #ffffff; font-weight: 900; font-size: 10px; padding: 2px 7px; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); border: 2px solid #ffffff; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; font-family: ui-monospace, monospace;">
+            <span>🏁</span>
+            ${endLabel}
+          </div>
+          <div style="width: 14px; height: 14px; border-radius: 9999px; background-color: #ef4444; border: 3px solid #ffffff; box-shadow: 0 0 14px #ef4444; margin-top: 2px;"></div>
+        `;
+        endMarkerRef.current = new maplibregl.Marker({ element: endEl, anchor: 'bottom' })
+          .setLngLat(endCoord)
+          .setPopup(
+            new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(`
+              <div style="color: #18191B; padding: 4px 8px; font-family: sans-serif; font-size: 11px; font-weight: bold;">
+                🏁 Destination: [${endCoord[1].toFixed(4)}, ${endCoord[0].toFixed(4)}]
+              </div>
+            `)
+          )
+          .addTo(map);
+      } else {
+        endMarkerRef.current.setLngLat(endCoord);
+      }
+    }
+
+    // Automatic camera fitting to encompass the starting to ending corridor
+    if (fitBoundsOnRoute) {
+      try {
+        const bounds = new maplibregl.LngLatBounds();
+        routeCoordinates.forEach(coord => bounds.extend(coord as [number, number]));
+        map.fitBounds(bounds, {
+          padding: { top: 55, bottom: 55, left: 50, right: 50 },
+          maxZoom: 16,
+          duration: 600
+        });
+      } catch (err) {
+        console.warn('[MapView] fitBounds error:', err);
+      }
+    }
+  };
+
+  // Map Initialization
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -128,61 +290,9 @@ export const MapView: React.FC<MapViewProps> = ({
       map.addControl(geolocate, 'top-right');
     }
 
-    const addRoutePolylines = () => {
-      if (routeCoordinates && routeCoordinates.length > 1 && !map.getSource('route-corridor')) {
-        map.addSource('route-corridor', {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            properties: {},
-            geometry: {
-              type: 'LineString',
-              coordinates: routeCoordinates
-            }
-          }
-        });
-
-        // Outer illuminated neon glow
-        map.addLayer({
-          id: 'route-glow',
-          type: 'line',
-          source: 'route-corridor',
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#2F7D4A',
-            'line-width': 12,
-            'line-opacity': 0.7
-          }
-        });
-
-        // Core bright green route line
-        map.addLayer({
-          id: 'route-line',
-          type: 'line',
-          source: 'route-corridor',
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#4ade80',
-            'line-width': 5
-          }
-        });
-
-        // Fit bounds
-        const bounds = new maplibregl.LngLatBounds();
-        routeCoordinates.forEach(coord => bounds.extend(coord as [number, number]));
-        map.fitBounds(bounds, { padding: 50, maxZoom: 15 });
-      }
-    };
-
     map.on('load', () => {
       map.resize();
-      addRoutePolylines();
+      syncRouteToMap();
     });
 
     // Auto-fallback if Thunderforest tiles encounter network/auth issues
@@ -192,6 +302,10 @@ export const MapView: React.FC<MapViewProps> = ({
         console.info('[NightShift MapView] Falling back to high-reliability OSM tiles.');
         setMapTheme('osm');
         map.setStyle(buildStyle('osm'));
+        map.once('styledata', () => {
+          map.resize();
+          syncRouteToMap();
+        });
       }
     });
 
@@ -206,7 +320,6 @@ export const MapView: React.FC<MapViewProps> = ({
       ro.observe(mapContainer.current);
     }
 
-    // Backup timers for layout settle
     const t1 = setTimeout(() => map.resize(), 100);
     const t2 = setTimeout(() => map.resize(), 500);
 
@@ -216,6 +329,20 @@ export const MapView: React.FC<MapViewProps> = ({
       clearTimeout(t1);
       clearTimeout(t2);
       if (ro) ro.disconnect();
+      if (startMarkerRef.current) {
+        startMarkerRef.current.remove();
+        startMarkerRef.current = null;
+      }
+      if (endMarkerRef.current) {
+        endMarkerRef.current.remove();
+        endMarkerRef.current = null;
+      }
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove();
+        userMarkerRef.current = null;
+      }
+      placeMarkersRef.current.forEach(m => m.remove());
+      placeMarkersRef.current = [];
       map.remove();
       mapRef.current = null;
     };
@@ -237,25 +364,12 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   }, [currentPosition?.[0], currentPosition?.[1], center?.[0], center?.[1]]);
 
-  // Update Route Polyline
+  // Sync route coordinates, start beacon, and end beacon
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    syncRouteToMap();
+  }, [routeCoordinates, startLabel, endLabel, fitBoundsOnRoute]);
 
-    const source = map.getSource('route-corridor') as maplibregl.GeoJSONSource | undefined;
-    if (source && routeCoordinates && routeCoordinates.length > 1) {
-      source.setData({
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'LineString',
-          coordinates: routeCoordinates
-        }
-      });
-    }
-  }, [routeCoordinates]);
-
-  // Update User Blue Dot Marker
+  // Update Live User GPS Marker (Pulsing Blue Dot)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -263,7 +377,13 @@ export const MapView: React.FC<MapViewProps> = ({
     if (currentPosition) {
       if (!userMarkerRef.current) {
         const el = document.createElement('div');
-        el.className = 'blue-dot';
+        el.className = 'user-live-marker flex items-center justify-center';
+        el.innerHTML = `
+          <div style="position: relative; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
+            <div style="position: absolute; width: 100%; height: 100%; border-radius: 9999px; background-color: rgba(59, 130, 246, 0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="width: 14px; height: 14px; border-radius: 9999px; background-color: #3b82f6; border: 3px solid #ffffff; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);"></div>
+          </div>
+        `;
         userMarkerRef.current = new maplibregl.Marker({ element: el })
           .setLngLat(currentPosition)
           .addTo(map);
@@ -337,28 +457,7 @@ export const MapView: React.FC<MapViewProps> = ({
       map.setStyle(buildStyle(theme));
       map.once('styledata', () => {
         map.resize();
-        if (routeCoordinates && routeCoordinates.length > 1 && !map.getSource('route-corridor')) {
-          map.addSource('route-corridor', {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              properties: {},
-              geometry: { type: 'LineString', coordinates: routeCoordinates }
-            }
-          });
-          map.addLayer({
-            id: 'route-glow',
-            type: 'line',
-            source: 'route-corridor',
-            paint: { 'line-color': '#2F7D4A', 'line-width': 12, 'line-opacity': 0.7 }
-          });
-          map.addLayer({
-            id: 'route-line',
-            type: 'line',
-            source: 'route-corridor',
-            paint: { 'line-color': '#4ade80', 'line-width': 5 }
-          });
-        }
+        syncRouteToMap();
       });
     }
   };

@@ -14,6 +14,7 @@ import {
   Radio,
   ArrowRight,
   RefreshCw,
+  Compass,
   X
 } from 'lucide-react';
 import { watchUserLocation, GeoCoordinates, DEFAULT_COORDS } from '../lib/geo';
@@ -41,6 +42,7 @@ export const NavigateScreen: React.FC<NavigateScreenProps> = ({
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const [etaRemainingMin, setEtaRemainingMin] = useState(plan.etaP50Min);
   const [sharedToast, setSharedToast] = useState(false);
+  const [fitRouteOverview, setFitRouteOverview] = useState(true);
   const [userLocation, setUserLocation] = useState<GeoCoordinates>(() => ({
     lat: polyline[0]?.[1] || DEFAULT_COORDS.lat,
     lng: polyline[0]?.[0] || DEFAULT_COORDS.lng,
@@ -235,6 +237,9 @@ export const NavigateScreen: React.FC<NavigateScreenProps> = ({
           currentPosition={currentCoords}
           center={currentCoords}
           zoom={16}
+          startLabel="START"
+          endLabel="DESTINATION"
+          fitBoundsOnRoute={fitRouteOverview}
         />
 
         {/* Live GPS Accuracy Floating Pill */}
@@ -245,6 +250,19 @@ export const NavigateScreen: React.FC<NavigateScreenProps> = ({
 
         {/* Floating Quick Action Buttons on Map */}
         <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
+          {/* Toggle Route Overview (Start-to-End) vs Focused Follow Mode */}
+          <button
+            onClick={() => setFitRouteOverview(prev => !prev)}
+            className={`p-2.5 rounded-xl backdrop-blur-md border shadow-xl transition-all ${
+              fitRouteOverview
+                ? 'bg-[#C8DC35] text-[#0F1210] border-white font-bold'
+                : 'bg-[#181C17]/95 text-white hover:text-[#C8DC35] border-[#2C342A]'
+            }`}
+            title={fitRouteOverview ? 'Route Overview (Start to End) Active - Click to Follow GPS' : 'Following GPS Position - Click for Route Overview'}
+          >
+            <Compass className="h-4 w-4" />
+          </button>
+
           {/* Share Live Tracking */}
           <button
             onClick={handleShareLiveLocation}
